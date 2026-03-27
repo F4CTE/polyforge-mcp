@@ -206,6 +206,33 @@ const TOOLS = [
       required: ["query"],
     },
   },
+  {
+    name: "place_order",
+    description: "Place a direct buy or sell order on a prediction market. Requires a connected Polymarket wallet.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Token ID to trade (get from market details)" },
+        side: { type: "string", enum: ["BUY", "SELL"], description: "Order side" },
+        outcome: { type: "string", enum: ["YES", "NO"], description: "Market outcome to trade" },
+        size: { type: "number", description: "Number of shares (minimum 1)" },
+        price: { type: "number", description: "Limit price per share (0.001-0.999). Use 0.999 for market buy, 0.001 for market sell." },
+        orderType: { type: "string", enum: ["GTC", "FOK", "GTD"], description: "Order type: GTC (good till cancel), FOK (fill or kill / market order), GTD (good till date). Default: GTC" },
+      },
+      required: ["tokenId", "side", "outcome", "size", "price"],
+    },
+  },
+  {
+    name: "cancel_order",
+    description: "Cancel a pending or live order",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Order ID to cancel" },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -238,6 +265,8 @@ const ROUTES: Record<string, RouteConfig> = {
   list_webhooks: { method: "GET", path: "/api/v1/webhooks" },
   create_webhook: { method: "POST", path: "/api/v1/webhooks", body: (a) => a },
   ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => a },
+  place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => a },
+  cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${a.id}` },
 };
 
 function pickDefined(obj: Record<string, unknown>, keys: string[]): Record<string, string> {
