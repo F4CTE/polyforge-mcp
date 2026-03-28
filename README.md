@@ -45,7 +45,7 @@ export POLYFORGE_API_URL=https://your-polyforge-instance.com
 export POLYFORGE_API_KEY=pf_your_api_key_here
 ```
 
-## Available Tools (20)
+## Available Tools (22)
 
 ### Markets
 | Tool | Description |

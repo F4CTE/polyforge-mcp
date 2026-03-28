@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.1] — 2026-03-28
+
+### Fixed
+- README tool count corrected from 20 to 22
+
 ## [1.1.0] — 2026-03-27
 
 ### Added
