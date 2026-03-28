@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.0] — 2026-03-29
+
+### Added
+- `get_strategy_events` tool — polls recent execution events for a running strategy; accepts `id`, `after_timestamp` (Unix ms cursor), and `limit`; returns a `{ events, nextAfterTimestamp }` batch for stateless follow-up calls
+- Total tools: 23
+
 ## [1.0.1] — 2026-03-28
 
 ### Fixed

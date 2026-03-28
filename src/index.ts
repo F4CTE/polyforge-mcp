@@ -233,6 +233,29 @@ const TOOLS = [
       required: ["id"],
     },
   },
+  {
+    name: "get_strategy_events",
+    description:
+      "Poll recent execution events for a running strategy. Returns up to `limit` events that arrived since the given `after_timestamp` (Unix ms). " +
+      "Call repeatedly to simulate a live feed — increment `after_timestamp` to the latest event's timestamp between calls. " +
+      "Note: MCP tools are request-response only; for continuous streaming use the TypeScript, Python, or Rust SDK instead.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID to watch" },
+        after_timestamp: {
+          type: "number",
+          description:
+            "Only return events with timestamp > this value (Unix ms). Pass 0 for all recent events. Default: 0",
+        },
+        limit: {
+          type: "number",
+          description: "Max events to return (default 20, max 100)",
+        },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -267,6 +290,7 @@ const ROUTES: Record<string, RouteConfig> = {
   ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => a },
   place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => a },
   cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${a.id}` },
+  // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
 function pickDefined(obj: Record<string, unknown>, keys: string[]): Record<string, string> {
@@ -298,6 +322,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  // ── get_strategy_events: SSE polling (collect N events then return) ──────
+  if (name === "get_strategy_events") {
+    const { id, after_timestamp = 0, limit = 20 } = args as {
+      id: string;
+      after_timestamp?: number;
+      limit?: number;
+    };
+    const cap = Math.min(Number(limit), 100);
+    try {
+      const result = await pollStrategyEvents(apiUrl, apiKey, String(id), Number(after_timestamp), cap);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `API error: ${message}` }], isError: true };
+    }
+  }
+
   const route = ROUTES[name];
   if (!route) {
     return {
@@ -319,6 +360,79 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 });
+
+// ─── Strategy events SSE poller ────────────────────────────────────
+
+/**
+ * Opens the SSE stream for a strategy, collects up to `limit` events that
+ * arrived after `afterTimestamp`, then closes the connection and returns them.
+ *
+ * This lets MCP tools (which are request-response) surface execution events
+ * without keeping a persistent connection open.
+ */
+async function pollStrategyEvents(
+  baseUrl: string,
+  apiKey: string,
+  strategyId: string,
+  afterTimestamp: number,
+  limit: number,
+): Promise<{ events: unknown[]; nextAfterTimestamp: number }> {
+  const url = new URL(`/api/v1/strategies/${encodeURIComponent(strategyId)}/events`, baseUrl);
+  const controller = new AbortController();
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: "text/event-stream",
+      "Cache-Control": "no-cache",
+    },
+    signal: controller.signal,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+  }
+
+  const events: unknown[] = [];
+  let nextTs = afterTimestamp;
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+
+  try {
+    while (events.length < limit) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+        try {
+          const payload = JSON.parse(raw) as { type?: string; timestamp?: number };
+          // Filter events newer than the requested cursor
+          if ((payload.timestamp ?? 0) > afterTimestamp) {
+            events.push(payload);
+            if ((payload.timestamp ?? 0) > nextTs) nextTs = payload.timestamp ?? nextTs;
+            if (events.length >= limit) break;
+          }
+        } catch {
+          // skip malformed
+        }
+      }
+    }
+  } finally {
+    controller.abort();
+    reader.cancel().catch(() => undefined);
+  }
+
+  return { events, nextAfterTimestamp: nextTs };
+}
 
 // ─── API client ────────────────────────────────────────────────────
 

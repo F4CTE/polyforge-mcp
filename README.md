@@ -45,7 +45,7 @@ export POLYFORGE_API_URL=https://your-polyforge-instance.com
 export POLYFORGE_API_KEY=pf_your_api_key_here
 ```
 
-## Available Tools (22)
+## Available Tools (23)
 
 ### Markets
 | Tool | Description |
@@ -64,6 +64,7 @@ export POLYFORGE_API_KEY=pf_your_api_key_here
 | `stop_strategy` | Stop a running strategy |
 | `get_strategy_templates` | List available templates |
 | `export_strategy` | Export as .polyforge JSON |
+| `get_strategy_events` | Poll recent execution events for a running strategy |
 
 ### Portfolio & Orders
 | Tool | Description |
@@ -71,6 +72,8 @@ export POLYFORGE_API_KEY=pf_your_api_key_here
 | `get_portfolio` | Current positions and P&L |
 | `get_orders` | Recent orders with filters |
 | `get_score` | Trader edge score and badges |
+| `place_order` | Place a direct buy/sell order on a market |
+| `cancel_order` | Cancel a pending or live order |
 
 ### Social & Signals
 | Tool | Description |
@@ -91,6 +94,22 @@ export POLYFORGE_API_KEY=pf_your_api_key_here
 |------|-------------|
 | `ai_query` | Natural language questions about your account |
 
+### Strategy Execution Watching
+
+`get_strategy_events` lets Claude poll execution events from a running strategy. MCP tools are request-response only, so this uses a cursor-based approach:
+
+```
+# First call — get the latest events
+get_strategy_events(id="strat-uuid", after_timestamp=0, limit=20)
+→ { events: [...], nextAfterTimestamp: 1711720500000 }
+
+# Follow-up call — only events newer than the cursor
+get_strategy_events(id="strat-uuid", after_timestamp=1711720500000, limit=20)
+→ { events: [...], nextAfterTimestamp: 1711720510000 }
+```
+
+For continuous streaming, use the TypeScript, Python, or Rust SDK's `watchStrategy`/`watch_strategy` method instead.
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
@@ -107,6 +126,8 @@ Once configured, you can ask Claude:
 - "What's my portfolio P&L this week?"
 - "Start my momentum strategy in paper mode"
 - "Show me whale trades over $50,000"
+- "What events have fired on my running strategy in the last minute?"
+- "Buy 10 YES shares on this market at 0.65"
 
 ## Development
 
