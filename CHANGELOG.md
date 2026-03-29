@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1] — 2026-03-29
+
+### Changed
+- README expanded with setup instructions for Cursor, Windsurf, Zed, Continue.dev, and custom MCP integrations
+- Clarified that the server implements the open MCP 1.0 stdio standard (not Claude-exclusive)
+- Removed `POLYFORGE_API_URL` from quick-start snippets (defaults to `https://api.polyforge.app`)
+
 ## [1.2.0] — 2026-03-29
 
 ### Added

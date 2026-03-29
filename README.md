@@ -2,6 +2,8 @@
 
 MCP (Model Context Protocol) server that lets AI assistants interact with the [Polyforge](https://github.com/your-org/polyforge) prediction market trading platform.
 
+Implements the open **MCP 1.0 stdio standard** — compatible with Claude Desktop, Claude Code, Cursor, Windsurf, Zed, Continue, and any MCP-compliant host.
+
 ## Quick Start
 
 ```bash
@@ -14,9 +16,13 @@ npx @polyforge/mcp-server
 
 Generate an API key in the Polyforge web app: **Settings > API Keys > Create Key**.
 
-### 2. Configure Claude Desktop
+---
 
-Add to your `claude_desktop_config.json`:
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -25,24 +31,102 @@ Add to your `claude_desktop_config.json`:
       "command": "npx",
       "args": ["@polyforge/mcp-server"],
       "env": {
-        "POLYFORGE_API_URL": "https://your-polyforge-instance.com",
-        "POLYFORGE_API_KEY": "pf_your_api_key_here"
+        "POLYFORGE_API_KEY": "pf_live_your_key"
       }
     }
   }
 }
 ```
 
-### 3. Configure Claude Code
+### Claude Code (CLI)
 
 ```bash
 claude mcp add polyforge -- npx @polyforge/mcp-server
+export POLYFORGE_API_KEY=pf_live_your_key
 ```
 
-Then set environment variables:
+### Cursor
+
+Open **Cursor Settings → MCP → Add Server**, or add to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "polyforge": {
+      "command": "npx",
+      "args": ["@polyforge/mcp-server"],
+      "env": {
+        "POLYFORGE_API_KEY": "pf_live_your_key"
+      }
+    }
+  }
+}
+```
+
+### Windsurf
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "polyforge": {
+      "command": "npx",
+      "args": ["@polyforge/mcp-server"],
+      "env": {
+        "POLYFORGE_API_KEY": "pf_live_your_key"
+      }
+    }
+  }
+}
+```
+
+### Zed
+
+Add to `settings.json` under `context_servers`:
+
+```json
+{
+  "context_servers": {
+    "polyforge": {
+      "command": {
+        "path": "npx",
+        "args": ["@polyforge/mcp-server"],
+        "env": {
+          "POLYFORGE_API_KEY": "pf_live_your_key"
+        }
+      }
+    }
+  }
+}
+```
+
+### Continue.dev
+
+Add to `~/.continue/config.json` under `mcpServers`:
+
+```json
+{
+  "mcpServers": [
+    {
+      "name": "polyforge",
+      "command": "npx",
+      "args": ["@polyforge/mcp-server"],
+      "env": {
+        "POLYFORGE_API_KEY": "pf_live_your_key"
+      }
+    }
+  ]
+}
+```
+
+### Custom / Any MCP Client
+
+Install globally and spawn:
+
 ```bash
-export POLYFORGE_API_URL=https://your-polyforge-instance.com
-export POLYFORGE_API_KEY=pf_your_api_key_here
+npm install -g @polyforge/mcp-server
+POLYFORGE_API_KEY=pf_live_your_key polyforge-mcp
 ```
 
 ## Available Tools (23)
