@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.1] — 2026-03-30
+
+### Fixed
+- `get_market_sentiment` response: API returns `direction` field (not `label`); updated tool description to reflect the correct field name (`direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL'`)
+
 ## [1.4.0] — 2026-03-30
 
 ### Added

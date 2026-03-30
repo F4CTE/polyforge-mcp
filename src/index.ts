@@ -8,7 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 const server = new Server(
-  { name: "polyforge", version: "1.0.0" },
+  { name: "polyforge", version: "1.3.0" },
   { capabilities: { tools: {} } },
 );
 
@@ -234,6 +234,225 @@ const TOOLS = [
     },
   },
   {
+    name: "get_portfolio_pnl",
+    description: "Get P&L chart data and win-rate for a time period. Optionally filter by strategy.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        period: { type: "string", enum: ["7d", "30d", "90d", "allTime"], description: "Time period (default: 30d)" },
+        strategyId: { type: "string", description: "Filter P&L to a specific strategy (optional)" },
+      },
+    },
+  },
+  {
+    name: "list_backtests",
+    description: "List historical backtests for your strategies.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Max results (default 20)" },
+        page: { type: "number", description: "Page number (default 1)" },
+        strategyId: { type: "string", description: "Filter by strategy ID" },
+      },
+    },
+  },
+  {
+    name: "get_backtest",
+    description: "Get full results and candle data for a specific backtest.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Backtest UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "run_backtest",
+    description: "Start a new backtest for a strategy over a historical date range.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        strategyId: { type: "string", description: "Strategy UUID to backtest" },
+        startDate: { type: "string", description: "ISO 8601 start date (e.g. 2024-01-01)" },
+        endDate: { type: "string", description: "ISO 8601 end date (e.g. 2024-12-31)" },
+        initialCapital: { type: "number", description: "Starting USDC capital (default 1000)" },
+      },
+      required: ["strategyId"],
+    },
+  },
+  {
+    name: "create_alert",
+    description: "Create a price alert for a market token. Triggers when the price crosses the threshold.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Token ID to monitor" },
+        type: { type: "string", enum: ["ABOVE", "BELOW"], description: "Alert when price goes above or below threshold" },
+        threshold: { type: "number", description: "Price threshold (0.001-0.999)" },
+        message: { type: "string", description: "Optional custom message for the alert" },
+      },
+      required: ["tokenId", "type", "threshold"],
+    },
+  },
+  {
+    name: "delete_alert",
+    description: "Delete an existing price alert.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Alert UUID to delete" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "close_position",
+    description: "Close an open position by selling all shares at market price (FOK order).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Token ID of the position to close" },
+        size: { type: "string", description: "Size to close (optional, defaults to full position)" },
+      },
+      required: ["tokenId"],
+    },
+  },
+  {
+    name: "list_conditional_orders",
+    description: "List your take-profit and stop-loss conditional orders.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        status: { type: "string", description: "Filter by status: PENDING, TRIGGERED, CANCELLED" },
+        limit: { type: "number", description: "Max results (default 20)" },
+      },
+    },
+  },
+  {
+    name: "create_conditional_order",
+    description: "Create a take-profit or stop-loss conditional order that triggers automatically when the market price reaches your threshold.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        marketId: { type: "string", description: "Market UUID" },
+        tokenId: { type: "string", description: "Token ID to trade when triggered" },
+        type: { type: "string", enum: ["TAKE_PROFIT", "STOP_LOSS"], description: "Conditional order type" },
+        side: { type: "string", enum: ["BUY", "SELL"], description: "Order side when triggered" },
+        outcome: { type: "string", enum: ["YES", "NO"], description: "Market outcome" },
+        size: { type: "string", description: "Number of shares" },
+        triggerPrice: { type: "string", description: "Price that triggers the order (0.001-0.999)" },
+      },
+      required: ["marketId", "tokenId", "type", "side", "outcome", "size", "triggerPrice"],
+    },
+  },
+  {
+    name: "get_arbitrage_opportunities",
+    description: "Scan all active prediction markets for merge arbitrage opportunities — markets where YES + NO prices sum to less than $1.00, locking in risk-free profit on resolution.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        minMargin: { type: "number", description: "Minimum profit margin percentage to include (default 0.5). Example: 2 = only show opportunities with 2%+ profit." },
+      },
+    },
+  },
+  {
+    name: "place_smart_order",
+    description: "Place an advanced smart order: TWAP (time-weighted), DCA (dollar-cost averaging), BRACKET (entry + take-profit + stop-loss bundle), or OCO (one-cancels-other).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        type: { type: "string", enum: ["TWAP", "DCA", "BRACKET", "OCO"], description: "Smart order execution algorithm" },
+        tokenId: { type: "string", description: "Token ID to trade" },
+        side: { type: "string", enum: ["BUY", "SELL"], description: "Order side" },
+        outcome: { type: "string", enum: ["YES", "NO"], description: "Market outcome" },
+        totalSize: { type: "number", description: "Total USDC size to deploy" },
+        slices: { type: "number", description: "Number of equal slices (TWAP/DCA, 2–100)" },
+        intervalMinutes: { type: "number", description: "Minutes between slices (TWAP/DCA, 1–10080)" },
+        limitPrice: { type: "number", description: "Optional limit price per slice (TWAP/DCA)" },
+        entryPrice: { type: "number", description: "Entry limit price (BRACKET)" },
+        takeProfitPrice: { type: "number", description: "Take-profit price (BRACKET)" },
+        stopLossPrice: { type: "number", description: "Stop-loss price (BRACKET)" },
+        priceA: { type: "number", description: "First leg price (OCO)" },
+        priceB: { type: "number", description: "Second leg price (OCO)" },
+      },
+      required: ["type", "tokenId", "side", "outcome", "totalSize"],
+    },
+  },
+  {
+    name: "list_smart_orders",
+    description: "List your smart orders (TWAP, DCA, BRACKET, OCO) with execution progress and child order details.",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "cancel_smart_order",
+    description: "Cancel a pending or active smart order and all its child orders.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Smart order UUID to cancel" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "browse_marketplace",
+    description: "Browse the Polyforge Strategy Marketplace — strategies published by other traders that you can purchase and fork to your account.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        sort: { type: "string", enum: ["newest", "popular", "rating", "price_asc", "price_desc"], description: "Sort order (default: newest)" },
+        tag: { type: "string", description: "Filter by tag (e.g. 'crypto', 'politics')" },
+        limit: { type: "number", description: "Max results (default 20, max 100)" },
+      },
+    },
+  },
+  {
+    name: "purchase_strategy",
+    description: "Purchase a marketplace strategy. You receive a private fork in your account that you can customize and run. Platform takes a 20% fee.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Marketplace listing UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "get_accuracy",
+    description: "Get prediction accuracy and calibration score for the authenticated user",
+    inputSchema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
+    name: "get_portfolio_review",
+    description: "Get AI-generated portfolio review and optimization suggestions",
+    inputSchema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
+    name: "get_market_sentiment",
+    description: "Get aggregated news sentiment for a specific market",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        marketId: { type: "string", description: "Market ID to get sentiment for" },
+      },
+      required: ["marketId"],
+    },
+  },
+  {
+    name: "provide_liquidity",
+    description: "Provide liquidity by placing two-sided quotes on a market token",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Token ID to provide liquidity for" },
+        spread: { type: "number", description: "Spread between bid and ask (e.g., 0.02 for 2%)" },
+        size: { type: "number", description: "Size in USDC to provide on each side" },
+      },
+      required: ["tokenId", "spread", "size"],
+    },
+  },
+  {
     name: "get_strategy_events",
     description:
       "Poll recent execution events for a running strategy. Returns up to `limit` events that arrived since the given `after_timestamp` (Unix ms). " +
@@ -283,6 +502,10 @@ const ROUTES: Record<string, RouteConfig> = {
   get_score: { method: "GET", path: "/api/v1/scores/me" },
   get_whale_feed: { method: "GET", path: "/api/v1/whales/feed", query: (a) => pickDefined(a, ["minSize"]) },
   get_news_signals: { method: "GET", path: "/api/v1/news/signals", query: (a) => pickDefined(a, ["minConfidence"]) },
+  get_accuracy: { method: "GET", path: "/api/v1/accuracy/me" },
+  get_portfolio_review: { method: "GET", path: "/api/v1/ai/portfolio-review" },
+  get_market_sentiment: { method: "GET", path: (a) => `/api/v1/news/sentiment/${a.marketId}` },
+  provide_liquidity: { method: "POST", path: "/api/v1/lp/provide", body: (a) => ({ tokenId: a.tokenId, spread: a.spread, size: a.size }) },
   list_alerts: { method: "GET", path: "/api/v1/alerts" },
   list_copy_configs: { method: "GET", path: "/api/v1/copy" },
   list_webhooks: { method: "GET", path: "/api/v1/webhooks" },
@@ -290,6 +513,21 @@ const ROUTES: Record<string, RouteConfig> = {
   ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => a },
   place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => a },
   cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${a.id}` },
+  get_portfolio_pnl: { method: "GET", path: "/api/v1/portfolio/pnl", query: (a) => pickDefined(a, ["period", "strategyId"]) },
+  list_backtests: { method: "GET", path: "/api/v1/backtests", query: (a) => pickDefined(a, ["limit", "page", "strategyId"]) },
+  get_backtest: { method: "GET", path: (a) => `/api/v1/backtests/${a.id}` },
+  run_backtest: { method: "POST", path: "/api/v1/backtests", body: (a) => a },
+  create_alert: { method: "POST", path: "/api/v1/alerts", body: (a) => a },
+  delete_alert: { method: "DELETE", path: (a) => `/api/v1/alerts/${a.id}` },
+  close_position: { method: "POST", path: "/api/v1/orders/close-position", body: (a) => a },
+  list_conditional_orders: { method: "GET", path: "/api/v1/orders/conditional", query: (a) => pickDefined(a, ["status", "limit"]) },
+  create_conditional_order: { method: "POST", path: "/api/v1/orders/conditional", body: (a) => a },
+  get_arbitrage_opportunities: { method: "GET", path: "/api/v1/arbitrage", query: (a) => pickDefined(a, ["minMargin"]) },
+  place_smart_order: { method: "POST", path: "/api/v1/orders/smart", body: (a) => a },
+  list_smart_orders: { method: "GET", path: "/api/v1/orders/smart" },
+  cancel_smart_order: { method: "DELETE", path: (a) => `/api/v1/orders/smart/${a.id}` },
+  browse_marketplace: { method: "GET", path: "/api/v1/marketplace", query: (a) => pickDefined(a, ["sort", "tag", "limit"]) },
+  purchase_strategy: { method: "POST", path: (a) => `/api/v1/marketplace/${a.id}/purchase` },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
