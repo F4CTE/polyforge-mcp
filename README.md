@@ -129,13 +129,14 @@ npm install -g @polyforge/mcp-server
 POLYFORGE_API_KEY=pf_live_your_key polyforge-mcp
 ```
 
-## Available Tools (23)
+## Available Tools (33)
 
 ### Markets
 | Tool | Description |
 |------|-------------|
 | `list_markets` | Browse prediction markets with search, category filter, pagination |
 | `get_market` | Get market details including tokens, prices, order book |
+| `provide_liquidity` | Place two-sided liquidity quotes on a market token |
 
 ### Strategies
 | Tool | Description |
@@ -158,12 +159,15 @@ POLYFORGE_API_KEY=pf_live_your_key polyforge-mcp
 | `get_score` | Trader edge score and badges |
 | `place_order` | Place a direct buy/sell order on a market |
 | `cancel_order` | Cancel a pending or live order |
+| `get_accuracy` | Get prediction accuracy stats (Brier score, calibration, win rate) |
+| `get_portfolio_review` | Get AI-generated portfolio review and optimization suggestions |
 
 ### Social & Signals
 | Tool | Description |
 |------|-------------|
 | `get_whale_feed` | Recent large trades |
 | `get_news_signals` | AI trading signals from news |
+| `get_market_sentiment` | Get aggregated news sentiment for a market (BULLISH/BEARISH/NEUTRAL) |
 
 ### Configuration
 | Tool | Description |
