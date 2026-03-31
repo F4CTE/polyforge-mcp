@@ -6,6 +6,74 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
+
+// ─── Input validation schemas (Zod) ──────────────────────────────
+// Validates all tool inputs before forwarding to the backend API.
+
+const createStrategySchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  tokenId: z.string().uuid().optional(),
+  rules: z.array(z.record(z.string(), z.unknown())).optional(),
+}).passthrough();
+
+const createStrategyFromDescriptionSchema = z.object({
+  description: z.string().min(1).max(5000),
+}).passthrough();
+
+const createWebhookSchema = z.object({
+  url: z.string().url(),
+  events: z.array(z.string().min(1)).min(1).optional(),
+  secret: z.string().min(16).max(256).optional(),
+}).passthrough();
+
+const aiQuerySchema = z.object({
+  query: z.string().min(1).max(5000),
+}).passthrough();
+
+const placeOrderSchema = z.object({
+  tokenId: z.string().uuid(),
+  side: z.enum(["BUY", "SELL"]),
+  outcome: z.enum(["YES", "NO"]),
+  size: z.number().positive().int().min(1),
+  price: z.number().min(0.001).max(0.999),
+  orderType: z.enum(["GTC", "GTD", "FOK"]).optional(),
+}).passthrough();
+
+const runBacktestSchema = z.object({
+  strategyId: z.string().uuid(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+}).passthrough();
+
+const createAlertSchema = z.object({
+  tokenId: z.string().uuid().optional(),
+  marketId: z.string().optional(),
+  condition: z.string().min(1).optional(),
+  threshold: z.number().optional(),
+}).passthrough();
+
+const closePositionSchema = z.object({
+  tokenId: z.string().uuid(),
+  outcome: z.enum(["YES", "NO"]).optional(),
+}).passthrough();
+
+const createConditionalOrderSchema = z.object({
+  tokenId: z.string().uuid(),
+  side: z.enum(["BUY", "SELL"]),
+  outcome: z.enum(["YES", "NO"]),
+  size: z.number().positive().int().min(1),
+  price: z.number().min(0.001).max(0.999),
+  triggerPrice: z.number().min(0).max(1).optional(),
+}).passthrough();
+
+const placeSmartOrderSchema = z.object({
+  tokenId: z.string().uuid(),
+  side: z.enum(["BUY", "SELL"]),
+  outcome: z.enum(["YES", "NO"]),
+  size: z.number().positive().int().min(1),
+}).passthrough();
 
 const server = new Server(
   { name: "polyforge", version: "1.3.0" },
@@ -506,9 +574,9 @@ const ROUTES: Record<string, RouteConfig> = {
   get_market: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.id))}` },
   list_strategies: { method: "GET", path: "/api/v1/strategies", query: (a) => pickDefined(a, ["status"]) },
   get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}` },
-  create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => a },
+  create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => createStrategySchema.parse(a) },
   update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = a as Record<string, unknown>; return rest; } },
-  create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => a },
+  create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => createStrategyFromDescriptionSchema.parse(a) },
   start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, body: (a) => ({ mode: a.mode ?? "paper" }) },
   stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/stop` },
   get_strategy_templates: { method: "GET", path: "/api/v1/strategies/templates" },
@@ -525,21 +593,21 @@ const ROUTES: Record<string, RouteConfig> = {
   list_alerts: { method: "GET", path: "/api/v1/alerts" },
   list_copy_configs: { method: "GET", path: "/api/v1/copy" },
   list_webhooks: { method: "GET", path: "/api/v1/webhooks" },
-  create_webhook: { method: "POST", path: "/api/v1/webhooks", body: (a) => a },
-  ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => a },
-  place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => a },
+  create_webhook: { method: "POST", path: "/api/v1/webhooks", body: (a) => createWebhookSchema.parse(a) },
+  ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => aiQuerySchema.parse(a) },
+  place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => placeOrderSchema.parse(a) },
   cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${encodeURIComponent(String(a.id))}` },
   get_portfolio_pnl: { method: "GET", path: "/api/v1/portfolio/pnl", query: (a) => pickDefined(a, ["period", "strategyId"]) },
   list_backtests: { method: "GET", path: "/api/v1/backtests", query: (a) => pickDefined(a, ["limit", "page", "strategyId"]) },
   get_backtest: { method: "GET", path: (a) => `/api/v1/backtests/${encodeURIComponent(String(a.id))}` },
-  run_backtest: { method: "POST", path: "/api/v1/backtests", body: (a) => a },
-  create_alert: { method: "POST", path: "/api/v1/alerts", body: (a) => a },
+  run_backtest: { method: "POST", path: "/api/v1/backtests", body: (a) => runBacktestSchema.parse(a) },
+  create_alert: { method: "POST", path: "/api/v1/alerts", body: (a) => createAlertSchema.parse(a) },
   delete_alert: { method: "DELETE", path: (a) => `/api/v1/alerts/${encodeURIComponent(String(a.id))}` },
-  close_position: { method: "POST", path: "/api/v1/orders/close-position", body: (a) => a },
+  close_position: { method: "POST", path: "/api/v1/orders/close-position", body: (a) => closePositionSchema.parse(a) },
   list_conditional_orders: { method: "GET", path: "/api/v1/orders/conditional", query: (a) => pickDefined(a, ["status", "limit"]) },
-  create_conditional_order: { method: "POST", path: "/api/v1/orders/conditional", body: (a) => a },
+  create_conditional_order: { method: "POST", path: "/api/v1/orders/conditional", body: (a) => createConditionalOrderSchema.parse(a) },
   get_arbitrage_opportunities: { method: "GET", path: "/api/v1/arbitrage", query: (a) => pickDefined(a, ["minMargin"]) },
-  place_smart_order: { method: "POST", path: "/api/v1/orders/smart", body: (a) => a },
+  place_smart_order: { method: "POST", path: "/api/v1/orders/smart", body: (a) => placeSmartOrderSchema.parse(a) },
   list_smart_orders: { method: "GET", path: "/api/v1/orders/smart" },
   cancel_smart_order: { method: "DELETE", path: (a) => `/api/v1/orders/smart/${encodeURIComponent(String(a.id))}` },
   browse_marketplace: { method: "GET", path: "/api/v1/marketplace", query: (a) => pickDefined(a, ["sort", "tag", "limit"]) },
@@ -645,6 +713,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
   } catch (err: unknown) {
+    if (err instanceof z.ZodError) {
+      const issues = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+      return {
+        content: [{ type: "text", text: `Validation error: ${issues}` }],
+        isError: true,
+      };
+    }
     const message = err instanceof Error ? err.message : String(err);
     return {
       content: [{ type: "text", text: `API error: ${message}` }],
@@ -732,7 +807,32 @@ async function pollStrategyEvents(
   return { events, nextAfterTimestamp: nextTs };
 }
 
+// ─── Rate limiter (token bucket) ──────────────────────────────────
+
+const RATE_LIMIT_TOKENS_PER_SEC = 10;
+const RATE_LIMIT_MAX_TOKENS = 20;
+let rateLimitTokens = RATE_LIMIT_MAX_TOKENS;
+let rateLimitLastRefill = Date.now();
+
+async function acquireRateLimitToken(): Promise<void> {
+  const now = Date.now();
+  const elapsed = (now - rateLimitLastRefill) / 1000;
+  rateLimitTokens = Math.min(RATE_LIMIT_MAX_TOKENS, rateLimitTokens + elapsed * RATE_LIMIT_TOKENS_PER_SEC);
+  rateLimitLastRefill = now;
+
+  if (rateLimitTokens < 1) {
+    const waitMs = ((1 - rateLimitTokens) / RATE_LIMIT_TOKENS_PER_SEC) * 1000;
+    await new Promise((r) => setTimeout(r, waitMs));
+    rateLimitTokens = 0;
+    rateLimitLastRefill = Date.now();
+  } else {
+    rateLimitTokens -= 1;
+  }
+}
+
 // ─── API client ────────────────────────────────────────────────────
+
+const MAX_RETRIES = 3;
 
 async function callApi(
   baseUrl: string,
@@ -750,24 +850,37 @@ async function callApi(
     }
   }
 
-  const res = await fetch(url.toString(), {
-    method: route.method,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: route.body ? JSON.stringify(route.body(args)) : undefined,
-    signal: AbortSignal.timeout(15000),
-  });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    await acquireRateLimitToken();
 
-  if (!res.ok) {
-    const raw = await res.text().catch(() => "");
-    // Truncate error body to prevent information disclosure
-    const sanitized = raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
-    throw new Error(`${res.status} ${res.statusText}: ${sanitized}`);
+    const res = await fetch(url.toString(), {
+      method: route.method,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: route.body ? JSON.stringify(route.body(args)) : undefined,
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      const retryAfter = Number(res.headers.get("retry-after") || "0");
+      const backoffMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(1000 * 2 ** attempt, 8000);
+      await new Promise((r) => setTimeout(r, backoffMs));
+      continue;
+    }
+
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      // Truncate error body to prevent information disclosure
+      const sanitized = raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
+      throw new Error(`${res.status} ${res.statusText}: ${sanitized}`);
+    }
+
+    return res.json();
   }
 
-  return res.json();
+  throw new Error("Rate limited: max retries exceeded");
 }
 
 // ─── Start ─────────────────────────────────────────────────────────
