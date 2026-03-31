@@ -68,8 +68,23 @@ const TOOLS = [
       properties: {
         name: { type: "string", description: "Strategy name" },
         description: { type: "string", description: "Strategy description" },
+        marketId: { type: "string", description: "Optional market ID to pin this strategy to a specific market" },
       },
       required: ["name"],
+    },
+  },
+  {
+    name: "update_strategy",
+    description: "Update a strategy's name, description, or pinned market",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+        name: { type: "string", description: "New strategy name" },
+        description: { type: "string", description: "New strategy description" },
+        marketId: { type: "string", description: "Market ID to pin strategy to (pass empty string to unpin)" },
+      },
+      required: ["id"],
     },
   },
   {
@@ -480,7 +495,7 @@ const TOOLS = [
 // ─── Route mapping ─────────────────────────────────────────────────
 
 interface RouteConfig {
-  method: "GET" | "POST" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string | ((args: Record<string, unknown>) => string);
   query?: (args: Record<string, unknown>) => Record<string, string>;
   body?: (args: Record<string, unknown>) => Record<string, unknown>;
@@ -492,6 +507,7 @@ const ROUTES: Record<string, RouteConfig> = {
   list_strategies: { method: "GET", path: "/api/v1/strategies", query: (a) => pickDefined(a, ["status"]) },
   get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${a.id}` },
   create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => a },
+  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${a.id}`, body: (a) => { const { id: _id, ...rest } = a as Record<string, unknown>; return rest; } },
   create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => a },
   start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${a.id}/start`, body: (a) => ({ mode: a.mode ?? "paper" }) },
   stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${a.id}/stop` },
