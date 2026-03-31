@@ -614,6 +614,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  // Validate webhook URL before forwarding to prevent SSRF
+  if (name === "create_webhook") {
+    const webhookUrl = (args as Record<string, unknown>).url;
+    if (typeof webhookUrl === "string") {
+      try {
+        const parsed = new URL(webhookUrl);
+        if (parsed.protocol !== "https:") {
+          return { content: [{ type: "text", text: "Error: Webhook URL must use HTTPS." }], isError: true };
+        }
+        const blocked = ["127.0.0.1", "localhost", "0.0.0.0", "169.254.169.254", "[::1]"];
+        const host = parsed.hostname.toLowerCase();
+        if (
+          blocked.includes(host) ||
+          host.startsWith("10.") ||
+          host.startsWith("192.168.") ||
+          /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+        ) {
+          return { content: [{ type: "text", text: "Error: Webhook URL cannot point to private or internal addresses." }], isError: true };
+        }
+      } catch {
+        return { content: [{ type: "text", text: "Error: Invalid webhook URL." }], isError: true };
+      }
+    }
+  }
+
   try {
     const result = await callApi(apiUrl, apiKey, route, args as Record<string, unknown>);
     return {
