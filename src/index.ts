@@ -503,16 +503,16 @@ interface RouteConfig {
 
 const ROUTES: Record<string, RouteConfig> = {
   list_markets: { method: "GET", path: "/api/v1/markets", query: (a) => pickDefined(a, ["search", "category", "limit", "page"]) },
-  get_market: { method: "GET", path: (a) => `/api/v1/markets/${a.id}` },
+  get_market: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.id))}` },
   list_strategies: { method: "GET", path: "/api/v1/strategies", query: (a) => pickDefined(a, ["status"]) },
-  get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${a.id}` },
+  get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}` },
   create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => a },
-  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${a.id}`, body: (a) => { const { id: _id, ...rest } = a as Record<string, unknown>; return rest; } },
+  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = a as Record<string, unknown>; return rest; } },
   create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => a },
-  start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${a.id}/start`, body: (a) => ({ mode: a.mode ?? "paper" }) },
-  stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${a.id}/stop` },
+  start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, body: (a) => ({ mode: a.mode ?? "paper" }) },
+  stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/stop` },
   get_strategy_templates: { method: "GET", path: "/api/v1/strategies/templates" },
-  export_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${a.id}/export` },
+  export_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/export` },
   get_portfolio: { method: "GET", path: "/api/v1/portfolio" },
   get_orders: { method: "GET", path: "/api/v1/orders", query: (a) => pickDefined(a, ["limit", "status"]) },
   get_score: { method: "GET", path: "/api/v1/scores/me" },
@@ -520,7 +520,7 @@ const ROUTES: Record<string, RouteConfig> = {
   get_news_signals: { method: "GET", path: "/api/v1/news/signals", query: (a) => pickDefined(a, ["minConfidence"]) },
   get_accuracy: { method: "GET", path: "/api/v1/accuracy/me" },
   get_portfolio_review: { method: "GET", path: "/api/v1/ai/portfolio-review" },
-  get_market_sentiment: { method: "GET", path: (a) => `/api/v1/news/sentiment/${a.marketId}` },
+  get_market_sentiment: { method: "GET", path: (a) => `/api/v1/news/sentiment/${encodeURIComponent(String(a.marketId))}` },
   provide_liquidity: { method: "POST", path: "/api/v1/lp/provide", body: (a) => ({ tokenId: a.tokenId, spread: a.spread, size: a.size }) },
   list_alerts: { method: "GET", path: "/api/v1/alerts" },
   list_copy_configs: { method: "GET", path: "/api/v1/copy" },
@@ -528,22 +528,22 @@ const ROUTES: Record<string, RouteConfig> = {
   create_webhook: { method: "POST", path: "/api/v1/webhooks", body: (a) => a },
   ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => a },
   place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => a },
-  cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${a.id}` },
+  cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${encodeURIComponent(String(a.id))}` },
   get_portfolio_pnl: { method: "GET", path: "/api/v1/portfolio/pnl", query: (a) => pickDefined(a, ["period", "strategyId"]) },
   list_backtests: { method: "GET", path: "/api/v1/backtests", query: (a) => pickDefined(a, ["limit", "page", "strategyId"]) },
-  get_backtest: { method: "GET", path: (a) => `/api/v1/backtests/${a.id}` },
+  get_backtest: { method: "GET", path: (a) => `/api/v1/backtests/${encodeURIComponent(String(a.id))}` },
   run_backtest: { method: "POST", path: "/api/v1/backtests", body: (a) => a },
   create_alert: { method: "POST", path: "/api/v1/alerts", body: (a) => a },
-  delete_alert: { method: "DELETE", path: (a) => `/api/v1/alerts/${a.id}` },
+  delete_alert: { method: "DELETE", path: (a) => `/api/v1/alerts/${encodeURIComponent(String(a.id))}` },
   close_position: { method: "POST", path: "/api/v1/orders/close-position", body: (a) => a },
   list_conditional_orders: { method: "GET", path: "/api/v1/orders/conditional", query: (a) => pickDefined(a, ["status", "limit"]) },
   create_conditional_order: { method: "POST", path: "/api/v1/orders/conditional", body: (a) => a },
   get_arbitrage_opportunities: { method: "GET", path: "/api/v1/arbitrage", query: (a) => pickDefined(a, ["minMargin"]) },
   place_smart_order: { method: "POST", path: "/api/v1/orders/smart", body: (a) => a },
   list_smart_orders: { method: "GET", path: "/api/v1/orders/smart" },
-  cancel_smart_order: { method: "DELETE", path: (a) => `/api/v1/orders/smart/${a.id}` },
+  cancel_smart_order: { method: "DELETE", path: (a) => `/api/v1/orders/smart/${encodeURIComponent(String(a.id))}` },
   browse_marketplace: { method: "GET", path: "/api/v1/marketplace", query: (a) => pickDefined(a, ["sort", "tag", "limit"]) },
-  purchase_strategy: { method: "POST", path: (a) => `/api/v1/marketplace/${a.id}/purchase` },
+  purchase_strategy: { method: "POST", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}/purchase` },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
@@ -566,7 +566,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
 
-  const apiUrl = process.env.POLYFORGE_API_URL || "http://localhost:3002";
+  const apiUrl = process.env.POLYFORGE_API_URL || "https://localhost:3002";
+
+  // Validate API URL — reject non-HTTPS for non-localhost hosts
+  const parsedApiUrl = new URL(apiUrl);
+  if (
+    parsedApiUrl.protocol !== "https:" &&
+    parsedApiUrl.hostname !== "localhost" &&
+    parsedApiUrl.hostname !== "127.0.0.1"
+  ) {
+    return {
+      content: [{ type: "text", text: "Error: POLYFORGE_API_URL must use HTTPS for non-localhost hosts." }],
+      isError: true,
+    };
+  }
   const apiKey = process.env.POLYFORGE_API_KEY;
 
   if (!apiKey) {
@@ -633,6 +646,8 @@ async function pollStrategyEvents(
 ): Promise<{ events: unknown[]; nextAfterTimestamp: number }> {
   const url = new URL(`/api/v1/strategies/${encodeURIComponent(strategyId)}/events`, baseUrl);
   const controller = new AbortController();
+  // Arm a 30-second wall-clock timeout to prevent indefinite hangs
+  const timeout = setTimeout(() => controller.abort(), 30_000);
 
   const res = await fetch(url.toString(), {
     headers: {
@@ -644,8 +659,11 @@ async function pollStrategyEvents(
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+    clearTimeout(timeout);
+    const raw = await res.text().catch(() => "");
+    // Truncate error body to avoid information disclosure
+    const sanitized = raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
+    throw new Error(`${res.status} ${res.statusText}: ${sanitized}`);
   }
 
   const events: unknown[] = [];
@@ -681,6 +699,7 @@ async function pollStrategyEvents(
       }
     }
   } finally {
+    clearTimeout(timeout);
     controller.abort();
     reader.cancel().catch(() => undefined);
   }
@@ -717,8 +736,10 @@ async function callApi(
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+    const raw = await res.text().catch(() => "");
+    // Truncate error body to prevent information disclosure
+    const sanitized = raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
+    throw new Error(`${res.status} ${res.statusText}: ${sanitized}`);
   }
 
   return res.json();
