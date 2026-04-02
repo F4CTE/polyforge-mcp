@@ -1,6 +1,6 @@
 # Polyforge MCP Server
 
-MCP (Model Context Protocol) server that lets AI assistants interact with the [Polyforge](https://github.com/your-org/polyforge) prediction market trading platform.
+MCP (Model Context Protocol) server that lets AI assistants interact with the [Polyforge](https://polyforge.app) prediction market trading platform.
 
 Implements the open **MCP 1.0 stdio standard** — compatible with Claude Desktop, Claude Code, Cursor, Windsurf, Zed, Continue, and any MCP-compliant host.
 
