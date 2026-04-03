@@ -54,6 +54,13 @@ const createAlertSchema = z.object({
   threshold: z.number().optional(),
 });
 
+const updateStrategySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional(),
+  marketId: z.string().optional(),
+}).passthrough();
+
 const closePositionSchema = z.object({
   tokenId: z.string().uuid(),
   outcome: z.enum(["YES", "NO"]).optional(),
@@ -69,10 +76,11 @@ const createConditionalOrderSchema = z.object({
 });
 
 const placeSmartOrderSchema = z.object({
+  type: z.enum(["TWAP", "DCA", "BRACKET", "OCO"]),
   tokenId: z.string().uuid(),
   side: z.enum(["BUY", "SELL"]),
   outcome: z.enum(["YES", "NO"]),
-  size: z.number().positive().int().min(1),
+  totalSize: z.number().positive().int().min(1),
 });
 
 const getStrategyEventsSchema = z.object({
@@ -581,7 +589,7 @@ const ROUTES: Record<string, RouteConfig> = {
   list_strategies: { method: "GET", path: "/api/v1/strategies", query: (a) => pickDefined(a, ["status"]) },
   get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}` },
   create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => createStrategySchema.parse(a) },
-  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = a as Record<string, unknown>; return rest; } },
+  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = updateStrategySchema.parse(a); return rest; } },
   create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => createStrategyFromDescriptionSchema.parse(a) },
   start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, body: (a) => ({ mode: a.mode ?? "paper" }) },
   stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/stop` },
