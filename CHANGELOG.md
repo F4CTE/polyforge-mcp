@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.0] — 2026-04-03
+
+### Added
+- `pause_strategy` tool — pause a running strategy (closes #14)
+- `resume_strategy` tool — resume a paused strategy (closes #14)
+- `fork_strategy` tool — fork a strategy to create an editable copy (closes #14)
+- `delete_strategy` tool — permanently delete a stopped strategy (closes #14)
+- `import_strategy` tool — import a strategy from a .polyforge JSON export (closes #14)
+- `redeem_position` tool — redeem winning shares after market resolution (closes #15)
+- `split_position` tool — split a position into smaller positions (closes #15)
+- `merge_position` tool — merge multiple positions into one (closes #15)
+- `get_marketplace_listing` tool — get details of a single marketplace listing (closes #15)
+- Total tools: 42
+
+### Fixed
+- `get_orders` tool: added missing `strategyId`, `from`, `to` query parameters for filtering orders by strategy and date range (closes #17)
+- `browse_marketplace` tool: added missing `offset` query parameter for pagination (closes #16)
+
 ## [1.4.2] — 2026-04-03
 
 ### Fixed

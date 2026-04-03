@@ -66,6 +66,25 @@ const closePositionSchema = z.object({
   outcome: z.enum(["YES", "NO"]).optional(),
 });
 
+const redeemPositionSchema = z.object({
+  tokenId: z.string().uuid(),
+  conditionId: z.string().uuid().optional(),
+});
+
+const splitPositionSchema = z.object({
+  tokenId: z.string().uuid(),
+  size: z.number().positive().int().min(1),
+  price: z.number().min(0.001).max(0.999),
+});
+
+const mergePositionSchema = z.object({
+  tokenIds: z.array(z.string().uuid()).min(2),
+});
+
+const importStrategySchema = z.object({
+  data: z.record(z.string(), z.unknown()),
+});
+
 const createConditionalOrderSchema = z.object({
   tokenId: z.string().uuid(),
   side: z.enum(["BUY", "SELL"]),
@@ -233,6 +252,9 @@ const TOOLS = [
       properties: {
         limit: { type: "number", description: "Max results (default 20)" },
         status: { type: "string", description: "Filter by order status (e.g. FILLED, PENDING, CANCELLED)" },
+        strategyId: { type: "string", description: "Filter orders by strategy UUID" },
+        from: { type: "string", description: "ISO 8601 start date filter (e.g. 2024-01-01)" },
+        to: { type: "string", description: "ISO 8601 end date filter (e.g. 2024-12-31)" },
       },
     },
   },
@@ -501,6 +523,7 @@ const TOOLS = [
         sort: { type: "string", enum: ["newest", "popular", "rating", "price_asc", "price_desc"], description: "Sort order (default: newest)" },
         tag: { type: "string", description: "Filter by tag (e.g. 'crypto', 'politics')" },
         limit: { type: "number", description: "Max results (default 20, max 100)" },
+        offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
       },
     },
   },
@@ -572,6 +595,114 @@ const TOOLS = [
       required: ["id"],
     },
   },
+  // ── Strategy management (closes #14) ────────────────────────────────
+  {
+    name: "pause_strategy",
+    description: "Pause a running strategy. The strategy keeps its state and can be resumed later.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "resume_strategy",
+    description: "Resume a previously paused strategy.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "fork_strategy",
+    description: "Fork a strategy to create a new editable copy in your account.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID to fork" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_strategy",
+    description: "Permanently delete a strategy. This cannot be undone. The strategy must be stopped first.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID to delete" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "import_strategy",
+    description: "Import a strategy from a .polyforge JSON export file. Creates a new strategy in your account.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        data: { type: "object", description: "Strategy export JSON data (from export_strategy)" },
+      },
+      required: ["data"],
+    },
+  },
+  // ── Trading tools (closes #15) ──────────────────────────────────────
+  {
+    name: "redeem_position",
+    description: "Redeem winning shares after a market resolves. Converts resolved YES/NO shares back to USDC.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Token ID of the resolved position to redeem" },
+        conditionId: { type: "string", description: "Condition ID of the market (optional)" },
+      },
+      required: ["tokenId"],
+    },
+  },
+  {
+    name: "split_position",
+    description: "Split a position into smaller positions at a specified price point.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Token ID of the position to split" },
+        size: { type: "number", description: "Number of shares to split" },
+        price: { type: "number", description: "Price point for the split (0.001-0.999)" },
+      },
+      required: ["tokenId", "size", "price"],
+    },
+  },
+  {
+    name: "merge_position",
+    description: "Merge multiple positions into a single position. All tokens must be for the same market.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of token IDs to merge (minimum 2)",
+        },
+      },
+      required: ["tokenIds"],
+    },
+  },
+  {
+    name: "get_marketplace_listing",
+    description: "Get full details of a specific marketplace listing including strategy description, author, price, reviews, and performance stats.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Marketplace listing UUID" },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -596,7 +727,7 @@ const ROUTES: Record<string, RouteConfig> = {
   get_strategy_templates: { method: "GET", path: "/api/v1/strategies/templates" },
   export_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/export` },
   get_portfolio: { method: "GET", path: "/api/v1/portfolio" },
-  get_orders: { method: "GET", path: "/api/v1/orders", query: (a) => pickDefined(a, ["limit", "status"]) },
+  get_orders: { method: "GET", path: "/api/v1/orders", query: (a) => pickDefined(a, ["limit", "status", "strategyId", "from", "to"]) },
   get_score: { method: "GET", path: "/api/v1/scores/me" },
   get_whale_feed: { method: "GET", path: "/api/v1/whales/feed", query: (a) => pickDefined(a, ["minSize"]) },
   get_news_signals: { method: "GET", path: "/api/v1/news/signals", query: (a) => pickDefined(a, ["minConfidence"]) },
@@ -624,8 +755,19 @@ const ROUTES: Record<string, RouteConfig> = {
   place_smart_order: { method: "POST", path: "/api/v1/orders/smart", body: (a) => placeSmartOrderSchema.parse(a) },
   list_smart_orders: { method: "GET", path: "/api/v1/orders/smart" },
   cancel_smart_order: { method: "DELETE", path: (a) => `/api/v1/orders/smart/${encodeURIComponent(String(a.id))}` },
-  browse_marketplace: { method: "GET", path: "/api/v1/marketplace", query: (a) => pickDefined(a, ["sort", "tag", "limit"]) },
+  browse_marketplace: { method: "GET", path: "/api/v1/marketplace", query: (a) => pickDefined(a, ["sort", "tag", "limit", "offset"]) },
   purchase_strategy: { method: "POST", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}/purchase` },
+  // Strategy management (closes #14)
+  pause_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/pause` },
+  resume_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/resume` },
+  fork_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/fork` },
+  delete_strategy: { method: "DELETE", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}` },
+  import_strategy: { method: "POST", path: "/api/v1/strategies/import", body: (a) => importStrategySchema.parse(a) },
+  // Trading tools (closes #15)
+  redeem_position: { method: "POST", path: "/api/v1/orders/redeem", body: (a) => redeemPositionSchema.parse(a) },
+  split_position: { method: "POST", path: "/api/v1/orders/split", body: (a) => splitPositionSchema.parse(a) },
+  merge_position: { method: "POST", path: "/api/v1/orders/merge", body: (a) => mergePositionSchema.parse(a) },
+  get_marketplace_listing: { method: "GET", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}` },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
