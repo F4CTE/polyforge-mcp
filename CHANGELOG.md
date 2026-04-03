@@ -6,6 +6,11 @@
 - **BREAKING** `place_smart_order` Zod schema: renamed `size` to `totalSize` to match the backend API field name; added `type` enum validation (`TWAP`, `DCA`, `BRACKET`, `OCO`) (closes #13)
 - **SECURITY** `update_strategy` handler: added `updateStrategySchema` Zod validation to prevent unvalidated fields from being forwarded to the backend API (closes #12)
 
+### Security
+- Remove `.passthrough()` from all 10 Zod input-validation schemas to prevent mass-assignment of arbitrary extra fields (closes #9)
+- Add Zod validation schema for `get_strategy_events` handler inputs (closes #10)
+- Harden webhook URL validation against SSRF: block IPv6 loopback/link-local/unique-local, IPv4-mapped IPv6, cloud metadata endpoints, carrier-grade NAT, `.local`/`.internal`/`.localhost` TLDs, URL credentials, and additional reserved ranges (closes #11)
+
 ## [1.4.1] — 2026-03-30
 
 ### Fixed

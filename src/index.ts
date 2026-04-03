@@ -16,21 +16,21 @@ const createStrategySchema = z.object({
   description: z.string().max(2000).optional(),
   tokenId: z.string().uuid().optional(),
   rules: z.array(z.record(z.string(), z.unknown())).optional(),
-}).passthrough();
+});
 
 const createStrategyFromDescriptionSchema = z.object({
   description: z.string().min(1).max(5000),
-}).passthrough();
+});
 
 const createWebhookSchema = z.object({
   url: z.string().url(),
   events: z.array(z.string().min(1)).min(1).optional(),
   secret: z.string().min(16).max(256).optional(),
-}).passthrough();
+});
 
 const aiQuerySchema = z.object({
   query: z.string().min(1).max(5000),
-}).passthrough();
+});
 
 const placeOrderSchema = z.object({
   tokenId: z.string().uuid(),
@@ -39,20 +39,20 @@ const placeOrderSchema = z.object({
   size: z.number().positive().int().min(1),
   price: z.number().min(0.001).max(0.999),
   orderType: z.enum(["GTC", "GTD", "FOK"]).optional(),
-}).passthrough();
+});
 
 const runBacktestSchema = z.object({
   strategyId: z.string().uuid(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-}).passthrough();
+});
 
 const createAlertSchema = z.object({
   tokenId: z.string().uuid().optional(),
   marketId: z.string().optional(),
   condition: z.string().min(1).optional(),
   threshold: z.number().optional(),
-}).passthrough();
+});
 
 const updateStrategySchema = z.object({
   id: z.string().uuid(),
@@ -64,7 +64,7 @@ const updateStrategySchema = z.object({
 const closePositionSchema = z.object({
   tokenId: z.string().uuid(),
   outcome: z.enum(["YES", "NO"]).optional(),
-}).passthrough();
+});
 
 const createConditionalOrderSchema = z.object({
   tokenId: z.string().uuid(),
@@ -73,7 +73,7 @@ const createConditionalOrderSchema = z.object({
   size: z.number().positive().int().min(1),
   price: z.number().min(0.001).max(0.999),
   triggerPrice: z.number().min(0).max(1).optional(),
-}).passthrough();
+});
 
 const placeSmartOrderSchema = z.object({
   type: z.enum(["TWAP", "DCA", "BRACKET", "OCO"]),
@@ -81,7 +81,13 @@ const placeSmartOrderSchema = z.object({
   side: z.enum(["BUY", "SELL"]),
   outcome: z.enum(["YES", "NO"]),
   totalSize: z.number().positive().int().min(1),
-}).passthrough();
+});
+
+const getStrategyEventsSchema = z.object({
+  id: z.string().uuid(),
+  after_timestamp: z.number().int().min(0).optional().default(0),
+  limit: z.number().int().min(1).max(100).optional().default(20),
+});
 
 const server = new Server(
   { name: "polyforge", version: "1.3.0" },
@@ -633,6 +639,138 @@ function pickDefined(obj: Record<string, unknown>, keys: string[]): Record<strin
   return result;
 }
 
+// ─── SSRF-safe webhook URL validation ─────────────────────────────
+
+/**
+ * Validates a webhook URL against SSRF attacks.
+ * Returns an error message string if the URL is unsafe, or null if it's OK.
+ */
+function validateWebhookUrl(rawUrl: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return "Error: Invalid webhook URL.";
+  }
+
+  // Require HTTPS
+  if (parsed.protocol !== "https:") {
+    return "Error: Webhook URL must use HTTPS.";
+  }
+
+  // Block credentials in URL
+  if (parsed.username || parsed.password) {
+    return "Error: Webhook URL must not contain credentials.";
+  }
+
+  const host = parsed.hostname.toLowerCase();
+
+  // Strip IPv6 brackets for analysis
+  const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+
+  // Block cloud metadata endpoints (with and without port)
+  const metadataHosts = ["169.254.169.254", "metadata.google.internal", "metadata.google"];
+  if (metadataHosts.includes(bare)) {
+    return "Error: Webhook URL cannot point to cloud metadata endpoints.";
+  }
+
+  // Check if the host looks like an IPv4 address
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const ipv4Match = bare.match(ipv4Regex);
+  if (ipv4Match) {
+    const octets = [
+      parseInt(ipv4Match[1], 10),
+      parseInt(ipv4Match[2], 10),
+      parseInt(ipv4Match[3], 10),
+      parseInt(ipv4Match[4], 10),
+    ];
+    if (isPrivateIPv4(octets)) {
+      return "Error: Webhook URL cannot point to private or internal addresses.";
+    }
+  }
+
+  // Check IPv6 addresses
+  if (bare.includes(":")) {
+    if (isPrivateIPv6(bare)) {
+      return "Error: Webhook URL cannot point to private or internal addresses.";
+    }
+  }
+
+  // Block well-known private/loopback hostnames
+  const blockedHostnames = ["localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback"];
+  if (blockedHostnames.includes(bare)) {
+    return "Error: Webhook URL cannot point to private or internal addresses.";
+  }
+
+  // Block .local, .internal, and .localhost TLDs (DNS rebinding vectors)
+  if (bare.endsWith(".local") || bare.endsWith(".internal") || bare.endsWith(".localhost")) {
+    return "Error: Webhook URL cannot point to private or internal addresses.";
+  }
+
+  return null;
+}
+
+function isPrivateIPv4(octets: number[]): boolean {
+  const [a, b, c, d] = octets;
+  // Validate range
+  if (octets.some((o) => o < 0 || o > 255)) return true; // invalid = block
+  // 0.0.0.0/8
+  if (a === 0) return true;
+  // 10.0.0.0/8
+  if (a === 10) return true;
+  // 100.64.0.0/10 (Carrier-grade NAT)
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  // 127.0.0.0/8 (loopback)
+  if (a === 127) return true;
+  // 169.254.0.0/16 (link-local)
+  if (a === 169 && b === 254) return true;
+  // 172.16.0.0/12
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  // 192.0.0.0/24 (IETF protocol assignments)
+  if (a === 192 && b === 0 && c === 0) return true;
+  // 192.0.2.0/24 (TEST-NET-1)
+  if (a === 192 && b === 0 && c === 2) return true;
+  // 192.88.99.0/24 (6to4 relay)
+  if (a === 192 && b === 88 && c === 99) return true;
+  // 192.168.0.0/16
+  if (a === 192 && b === 168) return true;
+  // 198.18.0.0/15 (benchmarking)
+  if (a === 198 && (b === 18 || b === 19)) return true;
+  // 198.51.100.0/24 (TEST-NET-2)
+  if (a === 198 && b === 51 && c === 100) return true;
+  // 203.0.113.0/24 (TEST-NET-3)
+  if (a === 203 && b === 0 && c === 113) return true;
+  // 224.0.0.0/4 (multicast) and 240.0.0.0/4 (reserved)
+  if (a >= 224) return true;
+  // 255.255.255.255 (broadcast)
+  if (a === 255 && b === 255 && c === 255 && d === 255) return true;
+  return false;
+}
+
+function isPrivateIPv6(addr: string): boolean {
+  const normalized = addr.toLowerCase();
+  // Unspecified (::)
+  if (normalized === "::" || normalized === "0000:0000:0000:0000:0000:0000:0000:0000") return true;
+  // Loopback (::1)
+  if (normalized === "::1" || normalized === "0000:0000:0000:0000:0000:0000:0000:0001") return true;
+  // Link-local (fe80::/10)
+  if (normalized.startsWith("fe80:") || normalized.startsWith("fe80")) return true;
+  // Unique local (fc00::/7 — fc00::/8 and fd00::/8)
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+  // IPv4-mapped IPv6 (::ffff:x.x.x.x) — check the embedded IPv4
+  const v4MappedMatch = normalized.match(/^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4MappedMatch) {
+    const octets = [
+      parseInt(v4MappedMatch[1], 10),
+      parseInt(v4MappedMatch[2], 10),
+      parseInt(v4MappedMatch[3], 10),
+      parseInt(v4MappedMatch[4], 10),
+    ];
+    return isPrivateIPv4(octets);
+  }
+  return false;
+}
+
 // ─── Handlers ──────────────────────────────────────────────────────
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -667,12 +805,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   // ── get_strategy_events: SSE polling (collect N events then return) ──────
   if (name === "get_strategy_events") {
-    const { id, after_timestamp = 0, limit = 20 } = args as {
-      id: string;
-      after_timestamp?: number;
-      limit?: number;
-    };
-    const cap = Math.min(Number(limit), 100);
+    const validated = getStrategyEventsSchema.parse(args);
+    const { id, after_timestamp, limit } = validated;
+    const cap = Math.min(limit, 100);
     try {
       const result = await pollStrategyEvents(apiUrl, apiKey, String(id), Number(after_timestamp), cap);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
@@ -694,23 +829,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (name === "create_webhook") {
     const webhookUrl = (args as Record<string, unknown>).url;
     if (typeof webhookUrl === "string") {
-      try {
-        const parsed = new URL(webhookUrl);
-        if (parsed.protocol !== "https:") {
-          return { content: [{ type: "text", text: "Error: Webhook URL must use HTTPS." }], isError: true };
-        }
-        const blocked = ["127.0.0.1", "localhost", "0.0.0.0", "169.254.169.254", "[::1]"];
-        const host = parsed.hostname.toLowerCase();
-        if (
-          blocked.includes(host) ||
-          host.startsWith("10.") ||
-          host.startsWith("192.168.") ||
-          /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
-        ) {
-          return { content: [{ type: "text", text: "Error: Webhook URL cannot point to private or internal addresses." }], isError: true };
-        }
-      } catch {
-        return { content: [{ type: "text", text: "Error: Invalid webhook URL." }], isError: true };
+      const ssrfError = validateWebhookUrl(webhookUrl);
+      if (ssrfError) {
+        return { content: [{ type: "text", text: ssrfError }], isError: true };
       }
     }
   }
