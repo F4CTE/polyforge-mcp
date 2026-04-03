@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.2] — 2026-04-03
+
+### Fixed
+- **BREAKING** `place_smart_order` Zod schema: renamed `size` to `totalSize` to match the backend API field name; added `type` enum validation (`TWAP`, `DCA`, `BRACKET`, `OCO`) (closes #13)
+- **SECURITY** `update_strategy` handler: added `updateStrategySchema` Zod validation to prevent unvalidated fields from being forwarded to the backend API (closes #12)
+
 ## [1.4.1] — 2026-03-30
 
 ### Fixed
