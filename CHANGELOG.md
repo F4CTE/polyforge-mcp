@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2] — 2026-04-03
+
+### Security
+- Remove `.passthrough()` from all 10 Zod input-validation schemas to prevent mass-assignment of arbitrary extra fields (closes #9)
+- Add Zod validation schema for `get_strategy_events` handler inputs (closes #10)
+- Harden webhook URL validation against SSRF: block IPv6 loopback/link-local/unique-local, IPv4-mapped IPv6, cloud metadata endpoints, carrier-grade NAT, `.local`/`.internal`/`.localhost` TLDs, URL credentials, and additional reserved ranges (closes #11)
+
 ## [1.4.1] — 2026-03-30
 
 ### Fixed
