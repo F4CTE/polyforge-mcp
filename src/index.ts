@@ -910,6 +910,14 @@ function isPrivateIPv6(addr: string): boolean {
     ];
     return isPrivateIPv4(octets);
   }
+  // IPv4-mapped IPv6 in hex-word form (::ffff:7f00:1) — Node normalizes to this
+  const v4MappedHex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (v4MappedHex) {
+    const high = parseInt(v4MappedHex[1], 16);
+    const low = parseInt(v4MappedHex[2], 16);
+    const octets = [(high >> 8) & 0xff, high & 0xff, (low >> 8) & 0xff, low & 0xff];
+    return isPrivateIPv4(octets);
+  }
   return false;
 }
 
