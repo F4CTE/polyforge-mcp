@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.1] — 2026-04-05
+
+### Fixed
+- **HIGH SSRF bypass**: `isPrivateIPv6` now detects IPv4-mapped IPv6 addresses in hex-word form (e.g. `::ffff:7f00:1`) that Node.js normalizes from dotted-decimal — previously only the dotted form (`::ffff:127.0.0.1`) was caught (closes #25)
+
 ## [1.5.0] — 2026-04-03
 
 ### Added
