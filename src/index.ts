@@ -59,7 +59,7 @@ const updateStrategySchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional(),
   marketId: z.string().optional(),
-}).passthrough();
+});
 
 const closePositionSchema = z.object({
   tokenId: z.string().uuid(),
@@ -79,6 +79,17 @@ const splitPositionSchema = z.object({
 
 const mergePositionSchema = z.object({
   tokenIds: z.array(z.string().uuid()).min(2),
+});
+
+const provideLiquiditySchema = z.object({
+  tokenId: z.string().uuid(),
+  spread: z.number().positive().max(1),
+  size: z.number().positive(),
+});
+
+const startStrategySchema = z.object({
+  id: z.string().uuid(),
+  mode: z.enum(["live", "paper"]).default("paper"),
 });
 
 const importStrategySchema = z.object({
@@ -720,9 +731,9 @@ const ROUTES: Record<string, RouteConfig> = {
   list_strategies: { method: "GET", path: "/api/v1/strategies", query: (a) => pickDefined(a, ["status"]) },
   get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}` },
   create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => createStrategySchema.parse(a) },
-  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = updateStrategySchema.parse(a); return rest; } },
+  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const parsed = updateStrategySchema.parse(a); return pickDefined(parsed as Record<string, unknown>, ["name", "description", "marketId"]); } },
   create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => createStrategyFromDescriptionSchema.parse(a) },
-  start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, body: (a) => ({ mode: a.mode ?? "paper" }) },
+  start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, body: (a) => { const parsed = startStrategySchema.parse(a); return { mode: parsed.mode }; } },
   stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/stop` },
   get_strategy_templates: { method: "GET", path: "/api/v1/strategies/templates" },
   export_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/export` },
@@ -734,7 +745,7 @@ const ROUTES: Record<string, RouteConfig> = {
   get_accuracy: { method: "GET", path: "/api/v1/accuracy/me" },
   get_portfolio_review: { method: "GET", path: "/api/v1/ai/portfolio-review" },
   get_market_sentiment: { method: "GET", path: (a) => `/api/v1/news/sentiment/${encodeURIComponent(String(a.marketId))}` },
-  provide_liquidity: { method: "POST", path: "/api/v1/lp/provide", body: (a) => ({ tokenId: a.tokenId, spread: a.spread, size: a.size }) },
+  provide_liquidity: { method: "POST", path: "/api/v1/lp/provide", body: (a) => provideLiquiditySchema.parse(a) },
   list_alerts: { method: "GET", path: "/api/v1/alerts" },
   list_copy_configs: { method: "GET", path: "/api/v1/copy" },
   list_webhooks: { method: "GET", path: "/api/v1/webhooks" },
@@ -1143,7 +1154,7 @@ async function callApi(
     });
 
     if (res.status === 429 && attempt < MAX_RETRIES) {
-      const retryAfter = Number(res.headers.get("retry-after") || "0");
+      const retryAfter = Math.min(Number(res.headers.get("retry-after") || "0"), 60);
       const backoffMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(1000 * 2 ** attempt, 8000);
       await new Promise((r) => setTimeout(r, backoffMs));
       continue;
