@@ -5,6 +5,11 @@
 ### Security
 - **CI**: switch from self-hosted runner to `ubuntu-latest` for `pull_request` events and add `permissions: contents: read` to restrict GITHUB_TOKEN scope (closes #69)
 - **SSRF**: add hex-word IPv4-mapped IPv6 pattern matching (`::ffff:7f00:1` form) to `isPrivateIPv6()` — prevents bypass of webhook URL validation via Node.js-normalized addresses (closes #25)
+- Remove `.passthrough()` from `updateStrategySchema` — prevents mass-assignment of arbitrary fields to `PATCH /strategies/:id` (closes #26, closes #37)
+- Add `provideLiquiditySchema` Zod validation — enforces UUID tokenId, positive spread ≤1, positive size before forwarding to `/lp/provide` (closes #28)
+- Add `startStrategySchema` Zod validation — enforces enum mode (`live`|`paper`) before forwarding to `/strategies/:id/start` (closes #28)
+- Cap `retry-after` header to 60 seconds — prevents server-controlled indefinite hang DoS (closes #27)
+- Use explicit field allowlist in `update_strategy` route body instead of spread operator
 
 ## [1.5.0] — 2026-04-03
 
