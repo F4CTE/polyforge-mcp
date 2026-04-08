@@ -17,6 +17,10 @@
 - **BREAKING**: `create_webhook` tool event values changed from SCREAMING_SNAKE_CASE to dot.notation to match platform (closes #43)
 - **BREAKING**: `create_strategy_from_description` tool sends `query` instead of `description` to match platform (closes #38)
 - **BREAKING**: `start_strategy` tool sends uppercase `"LIVE"`/`"PAPER"` mode values to match platform (closes #41)
+- **BREAKING** `callApi()`: handle 204 No Content responses — `delete_strategy` and `delete_alert` no longer crash with `SyntaxError: Unexpected end of JSON input` (closes #67)
+- **BREAKING** `createWebhookSchema`: remove non-existent `secret` field (causes 400 from platform) and make `events` required to match platform DTO (closes #68)
+- **BREAKING** `placeSmartOrderSchema`: add all optional TWAP/DCA/BRACKET/OCO parameters (`slices`, `intervalMinutes`, `limitPrice`, `entryPrice`, `takeProfitPrice`, `stopLossPrice`, `priceA`, `priceB`) that were silently stripped by Zod (closes #64)
+- `run_backtest`: add `initialBalance` to Zod schema so it's no longer stripped (closes #61)
 
 ## [1.5.0] — 2026-04-03
 
