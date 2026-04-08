@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.1] — 2026-04-08
+
+### Security
+- Switch CI from self-hosted to GitHub-hosted runners (`ubuntu-latest`) and add `permissions: contents: read` to prevent arbitrary code execution from fork PRs (closes #69)
+
 ## [1.5.0] — 2026-04-03
 
 ### Added
