@@ -9,7 +9,7 @@ on:
 jobs:
   check:
     name: Build
-    runs-on: [self-hosted, polyforge-sdk]
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
