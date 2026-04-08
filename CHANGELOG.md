@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+- **CI**: switch from self-hosted runner to `ubuntu-latest` for `pull_request` events and add `permissions: contents: read` to restrict GITHUB_TOKEN scope (closes #69)
+- **SSRF**: add hex-word IPv4-mapped IPv6 pattern matching (`::ffff:7f00:1` form) to `isPrivateIPv6()` — prevents bypass of webhook URL validation via Node.js-normalized addresses (closes #25)
+
 ## [1.5.0] — 2026-04-03
 
 ### Added

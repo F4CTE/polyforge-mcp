@@ -899,7 +899,7 @@ function isPrivateIPv6(addr: string): boolean {
   if (normalized.startsWith("fe80:") || normalized.startsWith("fe80")) return true;
   // Unique local (fc00::/7 — fc00::/8 and fd00::/8)
   if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-  // IPv4-mapped IPv6 (::ffff:x.x.x.x) — check the embedded IPv4
+  // IPv4-mapped IPv6 (::ffff:x.x.x.x) — check the embedded IPv4 (dotted-decimal form)
   const v4MappedMatch = normalized.match(/^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (v4MappedMatch) {
     const octets = [
@@ -908,6 +908,14 @@ function isPrivateIPv6(addr: string): boolean {
       parseInt(v4MappedMatch[3], 10),
       parseInt(v4MappedMatch[4], 10),
     ];
+    return isPrivateIPv4(octets);
+  }
+  // IPv4-mapped IPv6 hex-word form (::ffff:7f00:1) — Node.js normalizes to this
+  const v4MappedHex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (v4MappedHex) {
+    const high = parseInt(v4MappedHex[1], 16);
+    const low = parseInt(v4MappedHex[2], 16);
+    const octets = [(high >> 8) & 0xff, high & 0xff, (low >> 8) & 0xff, low & 0xff];
     return isPrivateIPv4(octets);
   }
   return false;
