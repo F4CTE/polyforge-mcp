@@ -93,8 +93,38 @@ const startStrategySchema = z.object({
   mode: z.enum(["live", "paper"]).default("paper"),
 });
 
+const importBlockSchema = z.object({
+  type: z.string().max(100),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+
 const importStrategySchema = z.object({
-  data: z.record(z.string(), z.unknown()),
+  data: z.object({
+    polyforge: z.string().max(20),
+    exportedAt: z.string().max(50).optional(),
+    strategy: z.object({
+      name: z.string().min(1).max(100),
+      description: z.string().max(500).optional(),
+      execMode: z.enum(["TICK", "EVENT", "HYBRID"]).optional(),
+      tickMs: z.number().int().min(200).max(60000).optional(),
+      visibility: z.enum(["PRIVATE", "PUBLIC", "UNLISTED"]).optional(),
+      tags: z.array(z.string().max(50)).max(20).optional(),
+      variables: z.array(z.object({
+        name: z.string().max(50).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
+        expression: z.string().max(200),
+      })).max(20).optional(),
+      blocks: z.object({
+        safety: z.array(importBlockSchema).max(20).optional(),
+        triggers: z.array(importBlockSchema).max(50).optional(),
+        conditions: z.array(importBlockSchema).max(50).optional(),
+        actions: z.array(importBlockSchema).max(50).optional(),
+      }).optional(),
+      canvas: z.object({
+        positions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })).optional(),
+        connections: z.array(z.object({ from: z.string(), to: z.string() })).optional(),
+      }).optional(),
+    }),
+  }),
 });
 
 const createConditionalOrderSchema = z.object({
@@ -730,11 +760,23 @@ const TOOLS = [
   },
   {
     name: "import_strategy",
-    description: "Import a strategy from a .polyforge JSON export file. Creates a new strategy in your account.",
+    description: "Import a strategy from a .polyforge JSON export file. Creates a new strategy in your account. The 'data' field must be the full .polyforge export object with polyforge version, optional exportedAt, and a strategy object.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        data: { type: "object", description: "Strategy export JSON data (from export_strategy)" },
+        data: {
+          type: "object",
+          description: "The .polyforge export object containing polyforge (version string), optional exportedAt, and strategy (with name, description, execMode, blocks, variables, canvas, etc.)",
+          properties: {
+            polyforge: { type: "string", description: "Export format version" },
+            exportedAt: { type: "string", description: "ISO timestamp of export" },
+            strategy: {
+              type: "object",
+              description: "Strategy definition with name, description, execMode, tickMs, visibility, tags, variables, blocks, and canvas",
+            },
+          },
+          required: ["polyforge", "strategy"],
+        },
       },
       required: ["data"],
     },
@@ -851,7 +893,7 @@ const ROUTES: Record<string, RouteConfig> = {
   resume_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/resume`, schema: idSchema },
   fork_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/fork`, schema: idSchema },
   delete_strategy: { method: "DELETE", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, schema: idSchema },
-  import_strategy: { method: "POST", path: "/api/v1/strategies/import", body: (a) => importStrategySchema.parse(a) },
+  import_strategy: { method: "POST", path: "/api/v1/strategies/import", body: (a) => importStrategySchema.parse(a).data },
   // Trading tools (closes #15)
   redeem_position: { method: "POST", path: "/api/v1/orders/redeem", body: (a) => redeemPositionSchema.parse(a) },
   split_position: { method: "POST", path: "/api/v1/orders/split", body: (a) => splitPositionSchema.parse(a) },
