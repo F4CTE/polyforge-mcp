@@ -24,8 +24,7 @@ const createStrategyFromDescriptionSchema = z.object({
 
 const createWebhookSchema = z.object({
   url: z.string().url(),
-  events: z.array(z.string().min(1)).min(1).optional(),
-  secret: z.string().min(16).max(256).optional(),
+  events: z.array(z.string().min(1)).min(1).max(8),
 });
 
 const aiQuerySchema = z.object({
@@ -46,7 +45,7 @@ const runBacktestSchema = z.object({
   strategyId: z.string().uuid(),
   dateRangeStart: z.string().optional(),
   dateRangeEnd: z.string().optional(),
-  initialBalance: z.number().optional(),
+  initialBalance: z.number().positive().optional(),
 });
 
 const createAlertSchema = z.object({
@@ -113,6 +112,14 @@ const placeSmartOrderSchema = z.object({
   side: z.enum(["BUY", "SELL"]),
   outcome: z.enum(["YES", "NO"]),
   totalSize: z.number().positive().int().min(1),
+  slices: z.number().int().min(2).max(100).optional(),
+  intervalMinutes: z.number().int().min(1).max(10080).optional(),
+  limitPrice: z.number().min(0.001).max(0.999).optional(),
+  entryPrice: z.number().min(0.001).max(0.999).optional(),
+  takeProfitPrice: z.number().min(0.001).max(0.999).optional(),
+  stopLossPrice: z.number().min(0.001).max(0.999).optional(),
+  priceA: z.number().min(0.001).max(0.999).optional(),
+  priceB: z.number().min(0.001).max(0.999).optional(),
 });
 
 const getStrategyEventsSchema = z.object({
@@ -409,7 +416,7 @@ const TOOLS = [
         strategyId: { type: "string", description: "Strategy UUID to backtest" },
         dateRangeStart: { type: "string", description: "ISO 8601 start date (e.g. 2024-01-01)" },
         dateRangeEnd: { type: "string", description: "ISO 8601 end date (e.g. 2024-12-31)" },
-        initialBalance: { type: "number", description: "Starting USDC capital (default 1000)" },
+        initialBalance: { type: "number", description: "Starting USDC balance (default 1000)" },
       },
       required: ["strategyId"],
     },
@@ -1170,6 +1177,9 @@ async function callApi(
       throw new Error(`${res.status} ${res.statusText}: ${sanitized}`);
     }
 
+    if (res.status === 204) {
+      return { success: true };
+    }
     return res.json();
   }
 
