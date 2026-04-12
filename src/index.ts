@@ -19,7 +19,7 @@ const createStrategySchema = z.object({
 });
 
 const createStrategyFromDescriptionSchema = z.object({
-  description: z.string().min(1).max(5000),
+  query: z.string().min(1).max(5000),
 });
 
 const createWebhookSchema = z.object({
@@ -29,7 +29,8 @@ const createWebhookSchema = z.object({
 });
 
 const aiQuerySchema = z.object({
-  query: z.string().min(1).max(5000),
+  question: z.string().min(1).max(5000),
+  context: z.string().max(5000).optional(),
 });
 
 const placeOrderSchema = z.object({
@@ -43,8 +44,9 @@ const placeOrderSchema = z.object({
 
 const runBacktestSchema = z.object({
   strategyId: z.string().uuid(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  dateRangeStart: z.string().optional(),
+  dateRangeEnd: z.string().optional(),
+  initialBalance: z.number().optional(),
 });
 
 const createAlertSchema = z.object({
@@ -205,10 +207,10 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        description: { type: "string", description: "Natural language description of what the strategy should do (e.g. 'buy YES on Trump markets when price drops below 40 cents')" },
+        query: { type: "string", description: "Natural language description of what the strategy should do (e.g. 'buy YES on Trump markets when price drops below 40 cents')" },
         marketId: { type: "string", description: "Optional market ID to bind the strategy to" },
       },
-      required: ["description"],
+      required: ["query"],
     },
   },
   {
@@ -218,7 +220,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Strategy UUID" },
-        mode: { type: "string", enum: ["live", "paper"], description: "Trading mode — paper is simulated, live places real orders (default: paper)" },
+        mode: { type: "string", enum: ["LIVE", "PAPER"], description: "Trading mode — PAPER is simulated, LIVE places real orders (default: PAPER)" },
       },
       required: ["id"],
     },
@@ -319,7 +321,7 @@ const TOOLS = [
         events: {
           type: "array",
           items: { type: "string" },
-          description: "Event types to subscribe to: ORDER_FILLED, STRATEGY_ERROR, WHALE_TRADE, NEWS_SIGNAL, BACKTEST_COMPLETE, DAILY_LOSS_LIMIT, MARKET_RESOLVED, PRICE_ALERT",
+          description: "Event types to subscribe to: order.filled, strategy.error, whale.trade, news.signal, backtest.complete, daily_loss.limit, market.resolved, price.alert",
         },
       },
       required: ["url", "events"],
@@ -331,9 +333,10 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        query: { type: "string", description: "Natural language query (e.g. 'what are my best performing strategies this week?')" },
+        question: { type: "string", description: "Natural language question (e.g. 'what are my best performing strategies this week?')" },
+        context: { type: "string", description: "Optional additional context to include with the question" },
       },
-      required: ["query"],
+      required: ["question"],
     },
   },
   {
@@ -404,9 +407,9 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         strategyId: { type: "string", description: "Strategy UUID to backtest" },
-        startDate: { type: "string", description: "ISO 8601 start date (e.g. 2024-01-01)" },
-        endDate: { type: "string", description: "ISO 8601 end date (e.g. 2024-12-31)" },
-        initialCapital: { type: "number", description: "Starting USDC capital (default 1000)" },
+        dateRangeStart: { type: "string", description: "ISO 8601 start date (e.g. 2024-01-01)" },
+        dateRangeEnd: { type: "string", description: "ISO 8601 end date (e.g. 2024-12-31)" },
+        initialBalance: { type: "number", description: "Starting USDC capital (default 1000)" },
       },
       required: ["strategyId"],
     },

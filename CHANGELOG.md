@@ -11,6 +11,13 @@
 - Cap `retry-after` header to 60 seconds — prevents server-controlled indefinite hang DoS (closes #27)
 - Use explicit field allowlist in `update_strategy` route body instead of spread operator
 
+### Fixed
+- **BREAKING**: `ai_query` tool sends `question` instead of `query` to match platform `AiQueryDto`; added optional `context` field (closes #50)
+- **BREAKING**: `run_backtest` tool sends `dateRangeStart`/`dateRangeEnd`/`initialBalance` instead of `startDate`/`endDate`/`initialCapital` to match platform contract (closes #46)
+- **BREAKING**: `create_webhook` tool event values changed from SCREAMING_SNAKE_CASE to dot.notation to match platform (closes #43)
+- **BREAKING**: `create_strategy_from_description` tool sends `query` instead of `description` to match platform (closes #38)
+- **BREAKING**: `start_strategy` tool sends uppercase `"LIVE"`/`"PAPER"` mode values to match platform (closes #41)
+
 ## [1.5.0] — 2026-04-03
 
 ### Added
