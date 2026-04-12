@@ -128,6 +128,73 @@ const getStrategyEventsSchema = z.object({
   limit: z.number().int().min(1).max(100).optional().default(20),
 });
 
+// ─── ID validation schemas (#48) ────────────────────────────────
+// Shared schemas for tools that accept ID parameters — enforces UUID
+// format at the MCP boundary instead of forwarding arbitrary strings.
+
+const idSchema = z.object({ id: z.string().uuid() });
+
+const marketIdParamSchema = z.object({ marketId: z.string().uuid() });
+
+// ─── Query parameter validation schemas (#49) ───────────────────
+// Bounded limits, typed numerics, and constrained enums for all GET tools.
+
+const listMarketsQuerySchema = z.object({
+  search: z.string().max(200).optional(),
+  category: z.enum(["Sports", "Crypto", "Politics", "Science", "Culture"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+});
+
+const listStrategiesQuerySchema = z.object({
+  status: z.enum(["IDLE", "RUNNING", "PAUSED", "PAPER"]).optional(),
+});
+
+const getOrdersQuerySchema = z.object({
+  status: z.string().max(50).optional(),
+  strategyId: z.string().uuid().optional(),
+  from: z.string().max(50).optional(),
+  to: z.string().max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const whaleFeedQuerySchema = z.object({
+  minSize: z.coerce.number().min(0).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const newsSignalsQuerySchema = z.object({
+  minConfidence: z.coerce.number().min(0).max(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const portfolioPnlQuerySchema = z.object({
+  period: z.enum(["1d", "7d", "30d", "90d", "all"]).optional(),
+  strategyId: z.string().uuid().optional(),
+});
+
+const listBacktestsQuerySchema = z.object({
+  strategyId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+});
+
+const listConditionalOrdersQuerySchema = z.object({
+  status: z.string().max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const arbitrageQuerySchema = z.object({
+  minMargin: z.coerce.number().min(0).max(1).optional(),
+});
+
+const browseMarketplaceQuerySchema = z.object({
+  sort: z.string().max(50).optional(),
+  tag: z.string().max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
 const server = new Server(
   { name: "polyforge", version: "1.3.0" },
   { capabilities: { tools: {} } },
@@ -731,30 +798,31 @@ const TOOLS = [
 interface RouteConfig {
   method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string | ((args: Record<string, unknown>) => string);
+  schema?: z.ZodType<unknown>;
   query?: (args: Record<string, unknown>) => Record<string, string>;
   body?: (args: Record<string, unknown>) => Record<string, unknown>;
 }
 
 const ROUTES: Record<string, RouteConfig> = {
-  list_markets: { method: "GET", path: "/api/v1/markets", query: (a) => pickDefined(a, ["search", "category", "limit", "page"]) },
-  get_market: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.id))}` },
-  list_strategies: { method: "GET", path: "/api/v1/strategies", query: (a) => pickDefined(a, ["status"]) },
-  get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}` },
+  list_markets: { method: "GET", path: "/api/v1/markets", schema: listMarketsQuerySchema, query: (a) => pickDefined(a, ["search", "category", "limit", "page"]) },
+  get_market: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+  list_strategies: { method: "GET", path: "/api/v1/strategies", schema: listStrategiesQuerySchema, query: (a) => pickDefined(a, ["status"]) },
+  get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => createStrategySchema.parse(a) },
   update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const parsed = updateStrategySchema.parse(a); return pickDefined(parsed as Record<string, unknown>, ["name", "description", "marketId"]); } },
   create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => createStrategyFromDescriptionSchema.parse(a) },
-  start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, body: (a) => { const parsed = startStrategySchema.parse(a); return { mode: parsed.mode }; } },
-  stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/stop` },
+  start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, schema: startStrategySchema, body: (a) => { const parsed = startStrategySchema.parse(a); return { mode: parsed.mode }; } },
+  stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/stop`, schema: idSchema },
   get_strategy_templates: { method: "GET", path: "/api/v1/strategies/templates" },
-  export_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/export` },
+  export_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/export`, schema: idSchema },
   get_portfolio: { method: "GET", path: "/api/v1/portfolio" },
-  get_orders: { method: "GET", path: "/api/v1/orders", query: (a) => pickDefined(a, ["limit", "status", "strategyId", "from", "to"]) },
+  get_orders: { method: "GET", path: "/api/v1/orders", schema: getOrdersQuerySchema, query: (a) => pickDefined(a, ["limit", "status", "strategyId", "from", "to"]) },
   get_score: { method: "GET", path: "/api/v1/scores/me" },
-  get_whale_feed: { method: "GET", path: "/api/v1/whales/feed", query: (a) => pickDefined(a, ["minSize"]) },
-  get_news_signals: { method: "GET", path: "/api/v1/news/signals", query: (a) => pickDefined(a, ["minConfidence"]) },
+  get_whale_feed: { method: "GET", path: "/api/v1/whales/feed", schema: whaleFeedQuerySchema, query: (a) => pickDefined(a, ["minSize", "limit"]) },
+  get_news_signals: { method: "GET", path: "/api/v1/news/signals", schema: newsSignalsQuerySchema, query: (a) => pickDefined(a, ["minConfidence", "limit"]) },
   get_accuracy: { method: "GET", path: "/api/v1/accuracy/me" },
   get_portfolio_review: { method: "GET", path: "/api/v1/ai/portfolio-review" },
-  get_market_sentiment: { method: "GET", path: (a) => `/api/v1/news/sentiment/${encodeURIComponent(String(a.marketId))}` },
+  get_market_sentiment: { method: "GET", path: (a) => `/api/v1/news/sentiment/${encodeURIComponent(String(a.marketId))}`, schema: marketIdParamSchema },
   provide_liquidity: { method: "POST", path: "/api/v1/lp/provide", body: (a) => provideLiquiditySchema.parse(a) },
   list_alerts: { method: "GET", path: "/api/v1/alerts" },
   list_copy_configs: { method: "GET", path: "/api/v1/copy" },
@@ -762,33 +830,33 @@ const ROUTES: Record<string, RouteConfig> = {
   create_webhook: { method: "POST", path: "/api/v1/webhooks", body: (a) => createWebhookSchema.parse(a) },
   ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => aiQuerySchema.parse(a) },
   place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => placeOrderSchema.parse(a) },
-  cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${encodeURIComponent(String(a.id))}` },
-  get_portfolio_pnl: { method: "GET", path: "/api/v1/portfolio/pnl", query: (a) => pickDefined(a, ["period", "strategyId"]) },
-  list_backtests: { method: "GET", path: "/api/v1/backtests", query: (a) => pickDefined(a, ["limit", "page", "strategyId"]) },
-  get_backtest: { method: "GET", path: (a) => `/api/v1/backtests/${encodeURIComponent(String(a.id))}` },
+  cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+  get_portfolio_pnl: { method: "GET", path: "/api/v1/portfolio/pnl", schema: portfolioPnlQuerySchema, query: (a) => pickDefined(a, ["period", "strategyId"]) },
+  list_backtests: { method: "GET", path: "/api/v1/backtests", schema: listBacktestsQuerySchema, query: (a) => pickDefined(a, ["limit", "page", "strategyId"]) },
+  get_backtest: { method: "GET", path: (a) => `/api/v1/backtests/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   run_backtest: { method: "POST", path: "/api/v1/backtests", body: (a) => runBacktestSchema.parse(a) },
   create_alert: { method: "POST", path: "/api/v1/alerts", body: (a) => createAlertSchema.parse(a) },
-  delete_alert: { method: "DELETE", path: (a) => `/api/v1/alerts/${encodeURIComponent(String(a.id))}` },
+  delete_alert: { method: "DELETE", path: (a) => `/api/v1/alerts/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   close_position: { method: "POST", path: "/api/v1/orders/close-position", body: (a) => closePositionSchema.parse(a) },
-  list_conditional_orders: { method: "GET", path: "/api/v1/orders/conditional", query: (a) => pickDefined(a, ["status", "limit"]) },
+  list_conditional_orders: { method: "GET", path: "/api/v1/orders/conditional", schema: listConditionalOrdersQuerySchema, query: (a) => pickDefined(a, ["status", "limit"]) },
   create_conditional_order: { method: "POST", path: "/api/v1/orders/conditional", body: (a) => createConditionalOrderSchema.parse(a) },
-  get_arbitrage_opportunities: { method: "GET", path: "/api/v1/arbitrage", query: (a) => pickDefined(a, ["minMargin"]) },
+  get_arbitrage_opportunities: { method: "GET", path: "/api/v1/arbitrage", schema: arbitrageQuerySchema, query: (a) => pickDefined(a, ["minMargin"]) },
   place_smart_order: { method: "POST", path: "/api/v1/orders/smart", body: (a) => placeSmartOrderSchema.parse(a) },
   list_smart_orders: { method: "GET", path: "/api/v1/orders/smart" },
-  cancel_smart_order: { method: "DELETE", path: (a) => `/api/v1/orders/smart/${encodeURIComponent(String(a.id))}` },
-  browse_marketplace: { method: "GET", path: "/api/v1/marketplace", query: (a) => pickDefined(a, ["sort", "tag", "limit", "offset"]) },
-  purchase_strategy: { method: "POST", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}/purchase` },
+  cancel_smart_order: { method: "DELETE", path: (a) => `/api/v1/orders/smart/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+  browse_marketplace: { method: "GET", path: "/api/v1/marketplace", schema: browseMarketplaceQuerySchema, query: (a) => pickDefined(a, ["sort", "tag", "limit", "offset"]) },
+  purchase_strategy: { method: "POST", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}/purchase`, schema: idSchema },
   // Strategy management (closes #14)
-  pause_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/pause` },
-  resume_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/resume` },
-  fork_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/fork` },
-  delete_strategy: { method: "DELETE", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}` },
+  pause_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/pause`, schema: idSchema },
+  resume_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/resume`, schema: idSchema },
+  fork_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/fork`, schema: idSchema },
+  delete_strategy: { method: "DELETE", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   import_strategy: { method: "POST", path: "/api/v1/strategies/import", body: (a) => importStrategySchema.parse(a) },
   // Trading tools (closes #15)
   redeem_position: { method: "POST", path: "/api/v1/orders/redeem", body: (a) => redeemPositionSchema.parse(a) },
   split_position: { method: "POST", path: "/api/v1/orders/split", body: (a) => splitPositionSchema.parse(a) },
   merge_position: { method: "POST", path: "/api/v1/orders/merge", body: (a) => mergePositionSchema.parse(a) },
-  get_marketplace_listing: { method: "GET", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}` },
+  get_marketplace_listing: { method: "GET", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
@@ -1140,6 +1208,11 @@ async function callApi(
   route: RouteConfig,
   args: Record<string, unknown>,
 ): Promise<unknown> {
+  // Validate inputs against the route schema before processing (#48, #49)
+  if (route.schema) {
+    route.schema.parse(args);
+  }
+
   const path = typeof route.path === "function" ? route.path(args) : route.path;
   const url = new URL(path, baseUrl);
 

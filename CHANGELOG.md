@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Security
+- **Input validation**: Add UUID format validation to all 15 ID-accepting tools (`get_market`, `get_strategy`, `cancel_order`, `delete_alert`, `get_backtest`, `export_strategy`, `stop_strategy`, `pause_strategy`, `resume_strategy`, `fork_strategy`, `delete_strategy`, `purchase_strategy`, `cancel_smart_order`, `get_marketplace_listing`, `get_market_sentiment`) — malformed IDs are rejected at the MCP boundary instead of forwarded to the backend (closes #48)
+- **Query validation**: Add Zod schemas with bounded limits (max 100), typed numerics, and enum constraints to all 11 query-parameter tools (`list_markets`, `get_orders`, `list_backtests`, `get_whale_feed`, `get_news_signals`, `browse_marketplace`, `get_portfolio_pnl`, `list_conditional_orders`, `get_arbitrage_opportunities`, `list_strategies`, `list_smart_orders`) — prevents unbounded limit DoS and type confusion (closes #49)
 - **CI**: switch from self-hosted runner to `ubuntu-latest` for `pull_request` events and add `permissions: contents: read` to restrict GITHUB_TOKEN scope (closes #69)
 - **SSRF**: add hex-word IPv4-mapped IPv6 pattern matching (`::ffff:7f00:1` form) to `isPrivateIPv6()` — prevents bypass of webhook URL validation via Node.js-normalized addresses (closes #25)
 - Remove `.passthrough()` from `updateStrategySchema` — prevents mass-assignment of arbitrary fields to `PATCH /strategies/:id` (closes #26, closes #37)
