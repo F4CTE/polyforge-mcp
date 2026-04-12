@@ -7,6 +7,8 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { resolve4, resolve6 } from "node:dns/promises";
+import { isIP } from "node:net";
 
 // ─── Input validation schemas (Zod) ──────────────────────────────
 // Validates all tool inputs before forwarding to the backend API.
@@ -917,8 +919,15 @@ function pickDefined(obj: Record<string, unknown>, keys: string[]): Record<strin
 /**
  * Validates a webhook URL against SSRF attacks.
  * Returns an error message string if the URL is unsafe, or null if it's OK.
+ *
+ * Performs DNS resolution for domain-based URLs to catch DNS rebinding attacks
+ * where a domain initially resolves to a public IP but is later changed to
+ * point to an internal address.
+ *
+ * **Note:** This is a client-side best-effort check.  The server must
+ * independently validate resolved IPs at connection time.
  */
-function validateWebhookUrl(rawUrl: string): string | null {
+async function validateWebhookUrl(rawUrl: string): Promise<string | null> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -960,14 +969,20 @@ function validateWebhookUrl(rawUrl: string): string | null {
     if (isPrivateIPv4(octets)) {
       return "Error: Webhook URL cannot point to private or internal addresses.";
     }
+    // Literal IP — no DNS resolution needed
+    return null;
   }
 
   // Check IPv6 addresses
-  if (bare.includes(":")) {
+  if (bare.includes(":") || isIP(bare) === 6) {
     if (isPrivateIPv6(bare)) {
       return "Error: Webhook URL cannot point to private or internal addresses.";
     }
+    // Literal IP — no DNS resolution needed
+    return null;
   }
+
+  // --- Hostname checks (before DNS resolution) ---
 
   // Block well-known private/loopback hostnames
   const blockedHostnames = ["localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback"];
@@ -978,6 +993,40 @@ function validateWebhookUrl(rawUrl: string): string | null {
   // Block .local, .internal, and .localhost TLDs (DNS rebinding vectors)
   if (bare.endsWith(".local") || bare.endsWith(".internal") || bare.endsWith(".localhost")) {
     return "Error: Webhook URL cannot point to private or internal addresses.";
+  }
+
+  // --- DNS resolution: resolve domain and check all IPs ---
+  // This mitigates DNS rebinding attacks where a domain initially resolves to
+  // a public IP but is later changed to point to an internal address.
+  const ipv4Addrs = await resolve4(bare).catch(() => [] as string[]);
+  const ipv6Addrs = await resolve6(bare).catch(() => [] as string[]);
+  const allAddrs = [...ipv4Addrs, ...ipv6Addrs];
+
+  if (allAddrs.length === 0) {
+    return "Error: Webhook URL hostname did not resolve to any address.";
+  }
+
+  for (const addr of allAddrs) {
+    // Check resolved IPv4 addresses
+    const v4Match = addr.match(ipv4Regex);
+    if (v4Match) {
+      const octets = [
+        parseInt(v4Match[1], 10),
+        parseInt(v4Match[2], 10),
+        parseInt(v4Match[3], 10),
+        parseInt(v4Match[4], 10),
+      ];
+      if (isPrivateIPv4(octets)) {
+        return "Error: Webhook URL resolves to a private or loopback address.";
+      }
+    }
+
+    // Check resolved IPv6 addresses
+    if (addr.includes(":")) {
+      if (isPrivateIPv6(addr)) {
+        return "Error: Webhook URL resolves to a private or loopback address.";
+      }
+    }
   }
 
   return null;
@@ -1110,7 +1159,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (name === "create_webhook") {
     const webhookUrl = (args as Record<string, unknown>).url;
     if (typeof webhookUrl === "string") {
-      const ssrfError = validateWebhookUrl(webhookUrl);
+      const ssrfError = await validateWebhookUrl(webhookUrl);
       if (ssrfError) {
         return { content: [{ type: "text", text: ssrfError }], isError: true };
       }
