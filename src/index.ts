@@ -664,6 +664,28 @@ const TOOLS = [
     },
   },
   {
+    name: "get_conditional_order",
+    description: "Get details of a specific conditional order (take-profit, stop-loss, trailing stop, etc.)",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Conditional order UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "cancel_conditional_order",
+    description: "Cancel a pending conditional order",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Conditional order UUID to cancel" },
+      },
+      required: ["id"],
+    },
+  },
+  {
     name: "get_arbitrage_opportunities",
     description: "Scan all active prediction markets for merge arbitrage opportunities — markets where YES + NO prices sum to less than $1.00, locking in risk-free profit on resolution.",
     inputSchema: {
@@ -955,6 +977,8 @@ const ROUTES: Record<string, RouteConfig> = {
   close_position: { method: "POST", path: "/api/v1/orders/close-position", body: (a) => closePositionSchema.parse(a) },
   list_conditional_orders: { method: "GET", path: "/api/v1/orders/conditional", schema: listConditionalOrdersQuerySchema, query: (a) => pickDefined(a, ["status", "type", "limit", "page"]) },
   create_conditional_order: { method: "POST", path: "/api/v1/orders/conditional", body: (a) => createConditionalOrderSchema.parse(a) },
+  get_conditional_order: { method: "GET", path: (a) => `/api/v1/orders/conditional/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+  cancel_conditional_order: { method: "DELETE", path: (a) => `/api/v1/orders/conditional/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   get_arbitrage_opportunities: { method: "GET", path: "/api/v1/arbitrage", schema: arbitrageQuerySchema, query: (a) => pickDefined(a, ["minMargin"]) },
   place_smart_order: { method: "POST", path: "/api/v1/orders/smart", body: (a) => placeSmartOrderSchema.parse(a) },
   list_smart_orders: { method: "GET", path: "/api/v1/orders/smart" },
