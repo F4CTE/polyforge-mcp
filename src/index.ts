@@ -21,6 +21,7 @@ const createStrategySchema = z.object({
 
 const createStrategyFromDescriptionSchema = z.object({
   description: z.string().min(1).max(5000),
+  marketId: z.string().optional(),
 });
 
 const createWebhookSchema = z.object({
@@ -37,7 +38,7 @@ const placeOrderSchema = z.object({
   tokenId: z.string().uuid(),
   side: z.enum(["BUY", "SELL"]),
   outcome: z.enum(["YES", "NO"]),
-  size: z.number().positive().int().min(1),
+  size: z.number().positive().min(1),
   price: z.number().min(0.001).max(0.999),
   orderType: z.enum(["GTC", "GTD", "FOK"]).optional(),
 });
@@ -46,7 +47,9 @@ const runBacktestSchema = z.object({
   strategyId: z.string().uuid(),
   dateRangeStart: z.string().optional(),
   dateRangeEnd: z.string().optional(),
-  initialBalance: z.number().positive().optional(),
+  quickMode: z.boolean().optional(),
+  strategyBlocks: z.unknown().optional(),
+  marketBindings: z.unknown().optional(),
 });
 
 const createAlertSchema = z.object({
@@ -65,7 +68,7 @@ const updateStrategySchema = z.object({
 
 const closePositionSchema = z.object({
   tokenId: z.string().uuid(),
-  size: z.number().positive().optional(),
+  size: z.string().optional(),
 });
 
 const redeemPositionSchema = z.object({
@@ -127,15 +130,10 @@ const importStrategySchema = z.object({
 
 const createConditionalOrderSchema = z.object({
   marketId: z.string(),
-  tokenId: z.string().uuid(),
-  type: z.enum(["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"]),
   side: z.enum(["BUY", "SELL"]),
-  outcome: z.enum(["YES", "NO"]),
-  size: z.number().positive().int().min(1),
+  size: z.number().positive(),
   triggerPrice: z.number().min(0).max(1),
   limitPrice: z.number().min(0.001).max(0.999).optional(),
-  trailingPct: z.string().optional(),
-  expiresAt: z.string().optional(),
 });
 
 const placeSmartOrderSchema = z.object({
@@ -143,7 +141,7 @@ const placeSmartOrderSchema = z.object({
   tokenId: z.string().uuid(),
   side: z.enum(["BUY", "SELL"]),
   outcome: z.enum(["YES", "NO"]),
-  totalSize: z.number().positive().int().min(1),
+  totalSize: z.number().positive().min(1),
   slices: z.number().int().min(2).max(100).optional(),
   intervalMinutes: z.number().int().min(1).max(10080).optional(),
   limitPrice: z.number().min(0.001).max(0.999).optional(),
@@ -515,7 +513,9 @@ const TOOLS = [
         strategyId: { type: "string", description: "Strategy UUID to backtest" },
         dateRangeStart: { type: "string", description: "ISO 8601 start date (e.g. 2024-01-01)" },
         dateRangeEnd: { type: "string", description: "ISO 8601 end date (e.g. 2024-12-31)" },
-        initialBalance: { type: "number", description: "Starting USDC balance (default 1000)" },
+        quickMode: { type: "boolean", description: "If true, run a faster approximate backtest (optional)" },
+        strategyBlocks: { type: "object", description: "Override strategy block configuration for the backtest (optional)" },
+        marketBindings: { type: "object", description: "Override market bindings for the backtest (optional)" },
       },
       required: ["strategyId"],
     },
@@ -575,17 +575,12 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         marketId: { type: "string", description: "Market UUID" },
-        tokenId: { type: "string", description: "Token ID to trade when triggered" },
-        type: { type: "string", enum: ["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"], description: "Conditional order type" },
         side: { type: "string", enum: ["BUY", "SELL"], description: "Order side when triggered" },
-        outcome: { type: "string", enum: ["YES", "NO"], description: "Market outcome" },
-        size: { type: "number", description: "Number of shares" },
+        size: { type: "number", description: "Number of shares (decimals accepted)" },
         triggerPrice: { type: "number", description: "Price that triggers the order (0-1)" },
         limitPrice: { type: "number", description: "Limit price for the order (0.001-0.999, optional)" },
-        trailingPct: { type: "string", description: "Trailing percentage for TRAILING_STOP orders" },
-        expiresAt: { type: "string", description: "Expiry timestamp (ISO 8601)" },
       },
-      required: ["marketId", "tokenId", "type", "side", "outcome", "size", "triggerPrice"],
+      required: ["marketId", "side", "size", "triggerPrice"],
     },
   },
   {
