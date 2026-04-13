@@ -50,10 +50,10 @@ const runBacktestSchema = z.object({
 });
 
 const createAlertSchema = z.object({
-  tokenId: z.string().uuid().optional(),
-  marketId: z.string().optional(),
-  condition: z.string().min(1).optional(),
-  threshold: z.number().optional(),
+  tokenId: z.string(),
+  direction: z.enum(["above", "below"]),
+  price: z.string(),
+  persistent: z.boolean().optional(),
 });
 
 const updateStrategySchema = z.object({
@@ -69,23 +69,22 @@ const closePositionSchema = z.object({
 });
 
 const redeemPositionSchema = z.object({
-  tokenId: z.string().uuid(),
-  conditionId: z.string().uuid().optional(),
+  positionId: z.string().uuid().optional(),
+  marketId: z.string().optional(),
 });
 
 const splitPositionSchema = z.object({
-  tokenId: z.string().uuid(),
-  size: z.number().positive().int().min(1),
-  price: z.number().min(0.001).max(0.999),
+  tokenId: z.string(),
+  amount: z.string(),
 });
 
 const mergePositionSchema = z.object({
-  tokenIds: z.array(z.string().uuid()).min(2),
+  tokenId: z.string(),
+  amount: z.string(),
 });
 
 const provideLiquiditySchema = z.object({
-  tokenId: z.string().uuid(),
-  spread: z.number().positive().max(1),
+  marketId: z.string(),
   size: z.number().positive(),
 });
 
@@ -100,31 +99,29 @@ const importBlockSchema = z.object({
 });
 
 const importStrategySchema = z.object({
-  data: z.object({
-    polyforge: z.string().max(20),
-    exportedAt: z.string().max(50).optional(),
-    strategy: z.object({
-      name: z.string().min(1).max(100),
-      description: z.string().max(500).optional(),
-      execMode: z.enum(["TICK", "EVENT", "HYBRID"]).optional(),
-      tickMs: z.number().int().min(200).max(60000).optional(),
-      visibility: z.enum(["PRIVATE", "PUBLIC", "UNLISTED"]).optional(),
-      tags: z.array(z.string().max(50)).max(20).optional(),
-      variables: z.array(z.object({
-        name: z.string().max(50).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
-        expression: z.string().max(200),
-      })).max(20).optional(),
-      blocks: z.object({
-        safety: z.array(importBlockSchema).max(20).optional(),
-        triggers: z.array(importBlockSchema).max(50).optional(),
-        conditions: z.array(importBlockSchema).max(50).optional(),
-        actions: z.array(importBlockSchema).max(50).optional(),
-      }).optional(),
-      canvas: z.object({
-        positions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })).optional(),
-        connections: z.array(z.object({ from: z.string(), to: z.string() })).optional(),
-      }).optional(),
-    }),
+  polyforge: z.string().max(20),
+  exportedAt: z.string().max(50).optional(),
+  strategy: z.object({
+    name: z.string().min(1).max(100),
+    description: z.string().max(500).optional(),
+    execMode: z.enum(["TICK", "EVENT", "HYBRID"]).optional(),
+    tickMs: z.number().int().min(200).max(60000).optional(),
+    visibility: z.enum(["PRIVATE", "PUBLIC", "UNLISTED"]).optional(),
+    tags: z.array(z.string().max(50)).max(20).optional(),
+    variables: z.array(z.object({
+      name: z.string().max(50).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
+      expression: z.string().max(200),
+    })).max(20).optional(),
+    blocks: z.object({
+      safety: z.array(importBlockSchema).max(20).optional(),
+      triggers: z.array(importBlockSchema).max(50).optional(),
+      conditions: z.array(importBlockSchema).max(50).optional(),
+      actions: z.array(importBlockSchema).max(50).optional(),
+    }).optional(),
+    canvas: z.object({
+      positions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })).optional(),
+      connections: z.array(z.object({ from: z.string(), to: z.string() })).optional(),
+    }).optional(),
   }),
 });
 
@@ -530,11 +527,11 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         tokenId: { type: "string", description: "Token ID to monitor" },
-        type: { type: "string", enum: ["ABOVE", "BELOW"], description: "Alert when price goes above or below threshold" },
-        threshold: { type: "number", description: "Price threshold (0.001-0.999)" },
-        message: { type: "string", description: "Optional custom message for the alert" },
+        direction: { type: "string", enum: ["above", "below"], description: "Alert when price goes above or below threshold" },
+        price: { type: "string", description: "Price threshold as a decimal string (e.g. '0.65')" },
+        persistent: { type: "boolean", description: "If true, alert re-arms after triggering (default false)" },
       },
-      required: ["tokenId", "type", "threshold"],
+      required: ["tokenId", "direction", "price"],
     },
   },
   {
@@ -687,15 +684,14 @@ const TOOLS = [
   },
   {
     name: "provide_liquidity",
-    description: "Provide liquidity by placing two-sided quotes on a market token",
+    description: "Provide liquidity to a market by depositing USDC.e",
     inputSchema: {
       type: "object" as const,
       properties: {
-        tokenId: { type: "string", description: "Token ID to provide liquidity for" },
-        spread: { type: "number", description: "Spread between bid and ask (e.g., 0.02 for 2%)" },
-        size: { type: "number", description: "Size in USDC to provide on each side" },
+        marketId: { type: "string", description: "Market ID to provide liquidity for" },
+        size: { type: "number", description: "Size in USDC to provide" },
       },
-      required: ["tokenId", "spread", "size"],
+      required: ["marketId", "size"],
     },
   },
   {
@@ -768,25 +764,18 @@ const TOOLS = [
   },
   {
     name: "import_strategy",
-    description: "Import a strategy from a .polyforge JSON export file. Creates a new strategy in your account. The 'data' field must be the full .polyforge export object with polyforge version, optional exportedAt, and a strategy object.",
+    description: "Import a strategy from a .polyforge JSON export. Creates a new strategy in your account. Pass the top-level polyforge version string and strategy object directly.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        data: {
+        polyforge: { type: "string", description: "Export format version (e.g. '1.0')" },
+        exportedAt: { type: "string", description: "ISO timestamp of export (optional)" },
+        strategy: {
           type: "object",
-          description: "The .polyforge export object containing polyforge (version string), optional exportedAt, and strategy (with name, description, execMode, blocks, variables, canvas, etc.)",
-          properties: {
-            polyforge: { type: "string", description: "Export format version" },
-            exportedAt: { type: "string", description: "ISO timestamp of export" },
-            strategy: {
-              type: "object",
-              description: "Strategy definition with name, description, execMode, tickMs, visibility, tags, variables, blocks, and canvas",
-            },
-          },
-          required: ["polyforge", "strategy"],
+          description: "Strategy definition with name, description, execMode, tickMs, visibility, tags, variables, blocks, and canvas",
         },
       },
-      required: ["data"],
+      required: ["polyforge", "strategy"],
     },
   },
   // ── Trading tools (closes #15) ──────────────────────────────────────
@@ -796,38 +785,33 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        tokenId: { type: "string", description: "Token ID of the resolved position to redeem" },
-        conditionId: { type: "string", description: "Condition ID of the market (optional)" },
+        positionId: { type: "string", description: "Position UUID to redeem (optional if marketId is provided)" },
+        marketId: { type: "string", description: "Market ID to redeem all resolved positions for (optional if positionId is provided)" },
       },
-      required: ["tokenId"],
     },
   },
   {
     name: "split_position",
-    description: "Split a position into smaller positions at a specified price point.",
+    description: "Split USDC.e collateral into YES and NO outcome tokens for a market.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        tokenId: { type: "string", description: "Token ID of the position to split" },
-        size: { type: "number", description: "Number of shares to split" },
-        price: { type: "number", description: "Price point for the split (0.001-0.999)" },
+        tokenId: { type: "string", description: "Token ID of the market to split into" },
+        amount: { type: "string", description: "Amount of USDC.e to split (decimal string, e.g. '100.5')" },
       },
-      required: ["tokenId", "size", "price"],
+      required: ["tokenId", "amount"],
     },
   },
   {
     name: "merge_position",
-    description: "Merge multiple positions into a single position. All tokens must be for the same market.",
+    description: "Merge YES and NO outcome tokens back into USDC.e collateral.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        tokenIds: {
-          type: "array",
-          items: { type: "string" },
-          description: "Array of token IDs to merge (minimum 2)",
-        },
+        tokenId: { type: "string", description: "Token ID of the market to merge from" },
+        amount: { type: "string", description: "Amount of token pairs to merge (decimal string, e.g. '100.5')" },
       },
-      required: ["tokenIds"],
+      required: ["tokenId", "amount"],
     },
   },
   {
@@ -901,7 +885,7 @@ const ROUTES: Record<string, RouteConfig> = {
   resume_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/resume`, schema: idSchema },
   fork_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/fork`, schema: idSchema },
   delete_strategy: { method: "DELETE", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, schema: idSchema },
-  import_strategy: { method: "POST", path: "/api/v1/strategies/import", body: (a) => importStrategySchema.parse(a).data },
+  import_strategy: { method: "POST", path: "/api/v1/strategies/import", body: (a) => importStrategySchema.parse(a) },
   // Trading tools (closes #15)
   redeem_position: { method: "POST", path: "/api/v1/orders/redeem", body: (a) => redeemPositionSchema.parse(a) },
   split_position: { method: "POST", path: "/api/v1/orders/split", body: (a) => splitPositionSchema.parse(a) },
