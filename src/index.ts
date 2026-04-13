@@ -449,6 +449,66 @@ const TOOLS = [
     },
   },
   {
+    name: "delete_webhook",
+    description: "Delete a registered webhook endpoint",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Webhook UUID to delete" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "test_webhook",
+    description: "Send a test event payload to a registered webhook to verify delivery",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Webhook UUID to test" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "list_watchlist",
+    description: "List your watched markets with current prices, 24h volume, and price delta",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "add_to_watchlist",
+    description: "Add a market to your watchlist for monitoring",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        marketId: { type: "string", description: "Market UUID to add to watchlist" },
+      },
+      required: ["marketId"],
+    },
+  },
+  {
+    name: "remove_from_watchlist",
+    description: "Remove a market from your watchlist",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        marketId: { type: "string", description: "Market UUID to remove from watchlist" },
+      },
+      required: ["marketId"],
+    },
+  },
+  {
+    name: "get_watchlist_status",
+    description: "Check whether a specific market is on your watchlist",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        marketId: { type: "string", description: "Market UUID to check" },
+      },
+      required: ["marketId"],
+    },
+  },
+  {
     name: "ai_query",
     description: "Ask a natural language question about your account, strategies, portfolio, or market data. The AI interprets your question and returns relevant information.",
     inputSchema: {
@@ -877,6 +937,12 @@ const ROUTES: Record<string, RouteConfig> = {
   list_copy_configs: { method: "GET", path: "/api/v1/copy" },
   list_webhooks: { method: "GET", path: "/api/v1/webhooks" },
   create_webhook: { method: "POST", path: "/api/v1/webhooks", body: (a) => createWebhookSchema.parse(a) },
+  delete_webhook: { method: "DELETE", path: (a) => `/api/v1/webhooks/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+  test_webhook: { method: "POST", path: (a) => `/api/v1/webhooks/${encodeURIComponent(String(a.id))}/test`, schema: idSchema },
+  list_watchlist: { method: "GET", path: "/api/v1/watchlist" },
+  add_to_watchlist: { method: "POST", path: "/api/v1/watchlist", body: (a) => marketIdParamSchema.parse(a) },
+  remove_from_watchlist: { method: "DELETE", path: (a) => `/api/v1/watchlist/${encodeURIComponent(String(a.marketId))}`, schema: marketIdParamSchema },
+  get_watchlist_status: { method: "GET", path: (a) => `/api/v1/watchlist/status/${encodeURIComponent(String(a.marketId))}`, schema: marketIdParamSchema },
   ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => aiQuerySchema.parse(a) },
   place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => placeOrderSchema.parse(a) },
   cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${encodeURIComponent(String(a.id))}`, schema: idSchema },

@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.2] — 2026-04-13
+
+### Added
+- `delete_webhook` tool — delete a registered webhook endpoint (closes #57)
+- `test_webhook` tool — send a test event to verify webhook delivery (closes #57)
+- `list_watchlist` tool — list watched markets with prices and volume (closes #54)
+- `add_to_watchlist` tool — add a market to the watchlist (closes #54)
+- `remove_from_watchlist` tool — remove a market from the watchlist (closes #54)
+- `get_watchlist_status` tool — check if a market is being watched (closes #54)
+
 ## [1.7.1] — 2026-04-13
 
 ### Fixed
