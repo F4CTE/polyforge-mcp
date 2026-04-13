@@ -172,20 +172,27 @@ const marketIdParamSchema = z.object({ marketId: z.string().uuid() });
 const listMarketsQuerySchema = z.object({
   search: z.string().max(200).optional(),
   category: z.enum(["Sports", "Crypto", "Politics", "Science", "Culture"]).optional(),
+  sort: z.enum(["volume", "endDate", "firstSeenAt", "newest", "closing_soon", "liquidity"]).optional(),
+  closed: z.boolean().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).optional(),
 });
 
 const listStrategiesQuerySchema = z.object({
   status: z.enum(["IDLE", "RUNNING", "PAUSED", "PAPER"]).optional(),
+  sort: z.enum(["createdAt", "updatedAt", "name", "status", "likeCount"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
 });
 
 const getOrdersQuerySchema = z.object({
   status: z.string().max(50).optional(),
   strategyId: z.string().uuid().optional(),
+  marketId: z.string().uuid().optional(),
   from: z.string().max(50).optional(),
   to: z.string().max(50).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
 });
 
 const whaleFeedQuerySchema = z.object({
@@ -205,13 +212,16 @@ const portfolioPnlQuerySchema = z.object({
 
 const listBacktestsQuerySchema = z.object({
   strategyId: z.string().uuid().optional(),
+  status: z.string().max(50).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).optional(),
 });
 
 const listConditionalOrdersQuerySchema = z.object({
   status: z.string().max(50).optional(),
+  type: z.enum(["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
 });
 
 const arbitrageQuerySchema = z.object({
@@ -241,6 +251,8 @@ const TOOLS = [
       properties: {
         search: { type: "string", description: "Search query to filter markets by title" },
         category: { type: "string", enum: ["Sports", "Crypto", "Politics", "Science", "Culture"], description: "Filter by category" },
+        sort: { type: "string", enum: ["volume", "endDate", "firstSeenAt", "newest", "closing_soon", "liquidity"], description: "Sort order (default: volume)" },
+        closed: { type: "boolean", description: "Include resolved/closed markets (default: false)" },
         limit: { type: "number", description: "Max results per page (default 10, max 100)" },
         page: { type: "number", description: "Page number (default 1)" },
       },
@@ -259,11 +271,14 @@ const TOOLS = [
   },
   {
     name: "list_strategies",
-    description: "List your trading strategies with optional status filter",
+    description: "List your trading strategies with optional status filter, sorting, and pagination",
     inputSchema: {
       type: "object" as const,
       properties: {
         status: { type: "string", enum: ["IDLE", "RUNNING", "PAUSED", "PAPER"], description: "Filter by strategy status" },
+        sort: { type: "string", enum: ["createdAt", "updatedAt", "name", "status", "likeCount"], description: "Sort order (default: createdAt)" },
+        limit: { type: "number", description: "Max results per page (default 20, max 100)" },
+        page: { type: "number", description: "Page number (default 1)" },
       },
     },
   },
@@ -368,8 +383,10 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         limit: { type: "number", description: "Max results (default 20)" },
+        page: { type: "number", description: "Page number (default 1)" },
         status: { type: "string", description: "Filter by order status (e.g. FILLED, PENDING, CANCELLED)" },
         strategyId: { type: "string", description: "Filter orders by strategy UUID" },
+        marketId: { type: "string", description: "Filter orders by market UUID" },
         from: { type: "string", description: "ISO 8601 start date filter (e.g. 2024-01-01)" },
         to: { type: "string", description: "ISO 8601 end date filter (e.g. 2024-12-31)" },
       },
@@ -490,6 +507,7 @@ const TOOLS = [
         limit: { type: "number", description: "Max results (default 20)" },
         page: { type: "number", description: "Page number (default 1)" },
         strategyId: { type: "string", description: "Filter by strategy ID" },
+        status: { type: "string", description: "Filter by backtest status (e.g. COMPLETED, RUNNING, FAILED)" },
       },
     },
   },
@@ -564,7 +582,9 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         status: { type: "string", description: "Filter by status: PENDING, TRIGGERED, CANCELLED" },
+        type: { type: "string", enum: ["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"], description: "Filter by order type" },
         limit: { type: "number", description: "Max results (default 20)" },
+        page: { type: "number", description: "Page number (default 1)" },
       },
     },
   },
@@ -833,9 +853,9 @@ interface RouteConfig {
 }
 
 const ROUTES: Record<string, RouteConfig> = {
-  list_markets: { method: "GET", path: "/api/v1/markets", schema: listMarketsQuerySchema, query: (a) => pickDefined(a, ["search", "category", "limit", "page"]) },
+  list_markets: { method: "GET", path: "/api/v1/markets", schema: listMarketsQuerySchema, query: (a) => pickDefined(a, ["search", "category", "sort", "closed", "limit", "page"]) },
   get_market: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.id))}`, schema: idSchema },
-  list_strategies: { method: "GET", path: "/api/v1/strategies", schema: listStrategiesQuerySchema, query: (a) => pickDefined(a, ["status"]) },
+  list_strategies: { method: "GET", path: "/api/v1/strategies", schema: listStrategiesQuerySchema, query: (a) => pickDefined(a, ["status", "sort", "limit", "page"]) },
   get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => createStrategySchema.parse(a) },
   update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const parsed = updateStrategySchema.parse(a); return pickDefined(parsed as Record<string, unknown>, ["name", "description", "marketId"]); } },
@@ -845,7 +865,7 @@ const ROUTES: Record<string, RouteConfig> = {
   get_strategy_templates: { method: "GET", path: "/api/v1/strategies/templates" },
   export_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/export`, schema: idSchema },
   get_portfolio: { method: "GET", path: "/api/v1/portfolio" },
-  get_orders: { method: "GET", path: "/api/v1/orders", schema: getOrdersQuerySchema, query: (a) => pickDefined(a, ["limit", "status", "strategyId", "from", "to"]) },
+  get_orders: { method: "GET", path: "/api/v1/orders", schema: getOrdersQuerySchema, query: (a) => pickDefined(a, ["limit", "page", "status", "strategyId", "marketId", "from", "to"]) },
   get_score: { method: "GET", path: "/api/v1/scores/me" },
   get_whale_feed: { method: "GET", path: "/api/v1/whales/feed", schema: whaleFeedQuerySchema, query: (a) => pickDefined(a, ["minSize", "limit"]) },
   get_news_signals: { method: "GET", path: "/api/v1/news/signals", schema: newsSignalsQuerySchema, query: (a) => pickDefined(a, ["minConfidence", "limit"]) },
@@ -861,13 +881,13 @@ const ROUTES: Record<string, RouteConfig> = {
   place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => placeOrderSchema.parse(a) },
   cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   get_portfolio_pnl: { method: "GET", path: "/api/v1/portfolio/pnl", schema: portfolioPnlQuerySchema, query: (a) => pickDefined(a, ["period", "strategyId"]) },
-  list_backtests: { method: "GET", path: "/api/v1/backtests", schema: listBacktestsQuerySchema, query: (a) => pickDefined(a, ["limit", "page", "strategyId"]) },
+  list_backtests: { method: "GET", path: "/api/v1/backtests", schema: listBacktestsQuerySchema, query: (a) => pickDefined(a, ["limit", "page", "strategyId", "status"]) },
   get_backtest: { method: "GET", path: (a) => `/api/v1/backtests/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   run_backtest: { method: "POST", path: "/api/v1/backtests", body: (a) => runBacktestSchema.parse(a) },
   create_alert: { method: "POST", path: "/api/v1/alerts", body: (a) => createAlertSchema.parse(a) },
   delete_alert: { method: "DELETE", path: (a) => `/api/v1/alerts/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   close_position: { method: "POST", path: "/api/v1/orders/close-position", body: (a) => closePositionSchema.parse(a) },
-  list_conditional_orders: { method: "GET", path: "/api/v1/orders/conditional", schema: listConditionalOrdersQuerySchema, query: (a) => pickDefined(a, ["status", "limit"]) },
+  list_conditional_orders: { method: "GET", path: "/api/v1/orders/conditional", schema: listConditionalOrdersQuerySchema, query: (a) => pickDefined(a, ["status", "type", "limit", "page"]) },
   create_conditional_order: { method: "POST", path: "/api/v1/orders/conditional", body: (a) => createConditionalOrderSchema.parse(a) },
   get_arbitrage_opportunities: { method: "GET", path: "/api/v1/arbitrage", schema: arbitrageQuerySchema, query: (a) => pickDefined(a, ["minMargin"]) },
   place_smart_order: { method: "POST", path: "/api/v1/orders/smart", body: (a) => placeSmartOrderSchema.parse(a) },
