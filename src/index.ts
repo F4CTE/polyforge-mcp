@@ -20,7 +20,7 @@ const createStrategySchema = z.object({
 });
 
 const createStrategyFromDescriptionSchema = z.object({
-  query: z.string().min(1).max(5000),
+  description: z.string().min(1).max(5000),
 });
 
 const createWebhookSchema = z.object({
@@ -29,7 +29,7 @@ const createWebhookSchema = z.object({
 });
 
 const aiQuerySchema = z.object({
-  question: z.string().min(1).max(5000),
+  query: z.string().min(1).max(5000),
   context: z.string().max(5000).optional(),
 });
 
@@ -316,10 +316,10 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        query: { type: "string", description: "Natural language description of what the strategy should do (e.g. 'buy YES on Trump markets when price drops below 40 cents')" },
+        description: { type: "string", description: "Natural language description of what the strategy should do (e.g. 'buy YES on Trump markets when price drops below 40 cents')" },
         marketId: { type: "string", description: "Optional market ID to bind the strategy to" },
       },
-      required: ["query"],
+      required: ["description"],
     },
   },
   {
@@ -329,7 +329,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Strategy UUID" },
-        mode: { type: "string", enum: ["LIVE", "PAPER"], description: "Trading mode — PAPER is simulated, LIVE places real orders (default: PAPER)" },
+        mode: { type: "string", enum: ["live", "paper"], description: "Trading mode — paper is simulated, live places real orders (default: paper)" },
       },
       required: ["id"],
     },
@@ -430,7 +430,7 @@ const TOOLS = [
         events: {
           type: "array",
           items: { type: "string" },
-          description: "Event types to subscribe to: order.filled, strategy.error, whale.trade, news.signal, backtest.complete, daily_loss.limit, market.resolved, price.alert",
+          description: "Event types to subscribe to: ORDER_FILLED, STRATEGY_ERROR, WHALE_TRADE, NEWS_SIGNAL, BACKTEST_COMPLETE, DAILY_LOSS_LIMIT, MARKET_RESOLVED, PRICE_ALERT",
         },
       },
       required: ["url", "events"],
@@ -442,10 +442,10 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        question: { type: "string", description: "Natural language question (e.g. 'what are my best performing strategies this week?')" },
-        context: { type: "string", description: "Optional additional context to include with the question" },
+        query: { type: "string", description: "Natural language question (e.g. 'what are my best performing strategies this week?')" },
+        context: { type: "string", description: "Optional additional context to include with the query" },
       },
-      required: ["question"],
+      required: ["query"],
     },
   },
   {
