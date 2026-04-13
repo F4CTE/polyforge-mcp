@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+- **BREAKING**: `close_position` Zod schema used `outcome` (enum YES/NO) instead of `size` (number) — partial close requests silently lost the size parameter, potentially closing entire positions instead of the requested amount (closes #58)
+- **BREAKING**: `create_strategy` Zod schema used `tokenId` instead of `marketId` — market binding was silently stripped; also removed phantom `rules` field not in platform contract (closes #59)
+- **BREAKING**: `create_conditional_order` Zod schema missing `marketId` and `type` fields (stripped by Zod, causing 422 errors); `price` renamed to `limitPrice` to match platform DTO; `triggerPrice` made required; added all 5 conditional order types (`TAKE_PROFIT`, `STOP_LOSS`, `TRAILING_STOP`, `LIMIT`, `PEGGED`) instead of only 2; added `trailingPct` and `expiresAt` optional fields (closes #52)
+
 ### Security
 - **DNS rebinding SSRF mitigation**: `validateWebhookUrl()` now resolves domain names via `dns.resolve4()`/`dns.resolve6()` and checks all resolved IPs against the private IP blocklist, preventing SSRF bypass via attacker-controlled DNS records; also handles decimal/octal-encoded IPs via URL parsing normalization; documents that this is a client-side best-effort check and the server must independently validate (closes #35)
 - **Import validation**: Replace open `z.record(z.string(), z.unknown())` in `importStrategySchema` with concrete schema matching backend `ImportStrategyDto` — validates name, description, execMode, blocks, variables, canvas with type constraints and size limits; unwrap `data` wrapper so backend receives correct shape; rejects prototype pollution payloads at MCP boundary (closes #70)

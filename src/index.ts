@@ -16,8 +16,7 @@ import { isIP } from "node:net";
 const createStrategySchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
-  tokenId: z.string().uuid().optional(),
-  rules: z.array(z.record(z.string(), z.unknown())).optional(),
+  marketId: z.string().optional(),
 });
 
 const createStrategyFromDescriptionSchema = z.object({
@@ -66,7 +65,7 @@ const updateStrategySchema = z.object({
 
 const closePositionSchema = z.object({
   tokenId: z.string().uuid(),
-  outcome: z.enum(["YES", "NO"]).optional(),
+  size: z.number().positive().optional(),
 });
 
 const redeemPositionSchema = z.object({
@@ -130,12 +129,16 @@ const importStrategySchema = z.object({
 });
 
 const createConditionalOrderSchema = z.object({
+  marketId: z.string(),
   tokenId: z.string().uuid(),
+  type: z.enum(["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"]),
   side: z.enum(["BUY", "SELL"]),
   outcome: z.enum(["YES", "NO"]),
   size: z.number().positive().int().min(1),
-  price: z.number().min(0.001).max(0.999),
-  triggerPrice: z.number().min(0).max(1).optional(),
+  triggerPrice: z.number().min(0).max(1),
+  limitPrice: z.number().min(0.001).max(0.999).optional(),
+  trailingPct: z.string().optional(),
+  expiresAt: z.string().optional(),
 });
 
 const placeSmartOrderSchema = z.object({
@@ -570,17 +573,20 @@ const TOOLS = [
   },
   {
     name: "create_conditional_order",
-    description: "Create a take-profit or stop-loss conditional order that triggers automatically when the market price reaches your threshold.",
+    description: "Create a conditional order that triggers automatically when the market price reaches your threshold.",
     inputSchema: {
       type: "object" as const,
       properties: {
         marketId: { type: "string", description: "Market UUID" },
         tokenId: { type: "string", description: "Token ID to trade when triggered" },
-        type: { type: "string", enum: ["TAKE_PROFIT", "STOP_LOSS"], description: "Conditional order type" },
+        type: { type: "string", enum: ["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"], description: "Conditional order type" },
         side: { type: "string", enum: ["BUY", "SELL"], description: "Order side when triggered" },
         outcome: { type: "string", enum: ["YES", "NO"], description: "Market outcome" },
-        size: { type: "string", description: "Number of shares" },
-        triggerPrice: { type: "string", description: "Price that triggers the order (0.001-0.999)" },
+        size: { type: "number", description: "Number of shares" },
+        triggerPrice: { type: "number", description: "Price that triggers the order (0-1)" },
+        limitPrice: { type: "number", description: "Limit price for the order (0.001-0.999, optional)" },
+        trailingPct: { type: "string", description: "Trailing percentage for TRAILING_STOP orders" },
+        expiresAt: { type: "string", description: "Expiry timestamp (ISO 8601)" },
       },
       required: ["marketId", "tokenId", "type", "side", "outcome", "size", "triggerPrice"],
     },
