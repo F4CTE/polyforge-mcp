@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.9] — 2026-04-13
+
+### Fixed
+- **BREAKING** `split_position`: schema used `{tokenId, size, price}` but platform expects `{tokenId, amount}` (decimal string) — all split calls returned 400 (closes #32)
+- **BREAKING** `merge_position`: schema used `{tokenIds: [...]}` (array of UUIDs) but platform expects `{tokenId, amount}` (single token + decimal string) — all merge calls returned 400 (closes #32)
+- **BREAKING** `provide_liquidity`: schema used `{tokenId, spread, size}` but platform expects `{marketId, size}` — wrong identifier field and phantom `spread` field caused 400 (closes #32)
+- **BREAKING** `redeem_position`: schema used `{tokenId, conditionId}` but platform expects `{positionId, marketId}` — completely wrong field names, redemption was non-functional (closes #33)
+- **BREAKING** `import_strategy`: body handler unwrapped `.data` property, stripping required `polyforge` and `strategy` fields — all imports returned 422 (closes #34)
+- **BREAKING** `create_alert`: three compounding bugs — field names (`type`→`direction`, `threshold`→`price`), case (`ABOVE`/`BELOW`→`above`/`below`), and Zod schema didn't match tool input schema — all alert creation returned 422 (closes #51)
+
 ## [1.6.8] — 2026-04-13
 
 ### Fixed
