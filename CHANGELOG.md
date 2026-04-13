@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.8] — 2026-04-13
+
+### Fixed
+- **BREAKING** `ai_query`: Zod schema and tool input use `query` instead of `question` to match platform `AiQueryDto` — AI queries were returning HTTP 400 (closes #85, regression of #50)
+- **BREAKING** `create_strategy_from_description`: Zod schema and tool input use `description` instead of `query` to match platform `CreateFromDescriptionDto` — AI strategy creation was returning HTTP 400 (closes #86, regression of #38)
+- **BREAKING** `create_webhook`: tool description now lists SCREAMING_SNAKE_CASE event names (`ORDER_FILLED` etc.) to match platform validation (closes #87, regression of #43)
+- **BREAKING** `start_strategy`: tool input enum uses lowercase `"live"`/`"paper"` instead of uppercase to match platform `StartStrategyDto` (closes #88, regression of #41)
+
 ## [Unreleased]
 
 ### Security
