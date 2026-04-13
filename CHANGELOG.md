@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Security
+- **Rate limiter (concurrency)**: wrap token bucket in async promise-chain mutex to prevent concurrent MCP tool invocations from bypassing rate limits during burst traffic; also apply rate limiting to `get_strategy_events` SSE polling which previously bypassed the limiter entirely (closes #39)
+- **API URL localhost fallback**: log explicit warning when `POLYFORGE_API_URL` is not set and the server falls back to `https://localhost:3002`; warns against `NODE_TLS_REJECT_UNAUTHORIZED=0` workaround; documents that production must set a real HTTPS endpoint (closes #47)
+
 ### Fixed
 - **BREAKING**: `close_position` Zod schema used `outcome` (enum YES/NO) instead of `size` (number) — partial close requests silently lost the size parameter, potentially closing entire positions instead of the requested amount (closes #58)
 - **BREAKING**: `create_strategy` Zod schema used `tokenId` instead of `marketId` — market binding was silently stripped; also removed phantom `rules` field not in platform contract (closes #59)

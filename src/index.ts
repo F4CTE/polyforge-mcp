@@ -1117,6 +1117,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
 
   const apiUrl = process.env.POLYFORGE_API_URL || "https://localhost:3002";
+  const isLocalhostFallback = !process.env.POLYFORGE_API_URL;
+
+  if (isLocalhostFallback) {
+    console.error(
+      "[polyforge-mcp] WARNING: POLYFORGE_API_URL is not set — falling back to https://localhost:3002. " +
+      "Production deployments MUST set POLYFORGE_API_URL to the real API endpoint (e.g. https://api.polyforge.app). " +
+      "Using localhost with HTTPS requires a trusted certificate; do NOT set NODE_TLS_REJECT_UNAUTHORIZED=0 as a workaround."
+    );
+  }
 
   // Validate API URL — reject non-HTTPS for non-localhost hosts
   const parsedApiUrl = new URL(apiUrl);
@@ -1141,6 +1150,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   // ── get_strategy_events: SSE polling (collect N events then return) ──────
   if (name === "get_strategy_events") {
+    await acquireRateLimitToken();
     const validated = getStrategyEventsSchema.parse(args);
     const { id, after_timestamp, limit } = validated;
     const cap = Math.min(limit, 100);
@@ -1272,14 +1282,17 @@ async function pollStrategyEvents(
   return { events, nextAfterTimestamp: nextTs };
 }
 
-// ─── Rate limiter (token bucket) ──────────────────────────────────
+// ─── Rate limiter (token bucket with async mutex) ────────────────
+// Wrap token consumption in a promise-chain mutex so concurrent MCP
+// tool invocations cannot read the same token count before deduction.
 
 const RATE_LIMIT_TOKENS_PER_SEC = 10;
 const RATE_LIMIT_MAX_TOKENS = 20;
 let rateLimitTokens = RATE_LIMIT_MAX_TOKENS;
 let rateLimitLastRefill = Date.now();
+let rateLimitMutex: Promise<void> = Promise.resolve();
 
-async function acquireRateLimitToken(): Promise<void> {
+function doAcquireToken(): Promise<void> {
   const now = Date.now();
   const elapsed = (now - rateLimitLastRefill) / 1000;
   rateLimitTokens = Math.min(RATE_LIMIT_MAX_TOKENS, rateLimitTokens + elapsed * RATE_LIMIT_TOKENS_PER_SEC);
@@ -1287,12 +1300,20 @@ async function acquireRateLimitToken(): Promise<void> {
 
   if (rateLimitTokens < 1) {
     const waitMs = ((1 - rateLimitTokens) / RATE_LIMIT_TOKENS_PER_SEC) * 1000;
-    await new Promise((r) => setTimeout(r, waitMs));
-    rateLimitTokens = 0;
-    rateLimitLastRefill = Date.now();
+    return new Promise((r) => setTimeout(r, waitMs)).then(() => {
+      rateLimitTokens = 0;
+      rateLimitLastRefill = Date.now();
+    });
   } else {
     rateLimitTokens -= 1;
+    return Promise.resolve();
   }
+}
+
+async function acquireRateLimitToken(): Promise<void> {
+  const ticket = rateLimitMutex.then(() => doAcquireToken());
+  rateLimitMutex = ticket.then(() => undefined, () => undefined);
+  return ticket;
 }
 
 // ─── API client ────────────────────────────────────────────────────
