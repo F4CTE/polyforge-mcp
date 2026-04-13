@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.1] — 2026-04-13
+
+### Fixed
+- `list_markets`: add missing `sort` and `closed` query parameters from platform `MarketQueryDto` (closes #75)
+- `list_strategies`: add missing `sort`, `page`, and `limit` query parameters from platform `StrategyQueryDto` (closes #79)
+- `get_orders`: add missing `marketId` and `page` query parameters from platform `OrderQueryDto` (closes #76)
+- `list_backtests`: add missing `status` query parameter from platform `BacktestQueryDto` (closes #74)
+- `list_conditional_orders`: add missing `type` and `page` query parameters from platform `ConditionalOrderQueryDto` (closes #73)
+
 ## [1.7.0] — 2026-04-13
 
 ### Fixed
