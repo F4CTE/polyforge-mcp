@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.0] — 2026-04-13
+
+### Fixed
+- **BREAKING** `create_strategy_from_description`: Zod schema silently stripped `marketId` — AI-generated strategies could not be bound to a market (closes #60)
+- **BREAKING** `run_backtest`: removed phantom `initialBalance` field not in platform contract; added `quickMode`, `strategyBlocks`, `marketBindings` optional fields to match platform DTO (closes #23)
+- **BREAKING** `create_conditional_order`: removed `tokenId`, `outcome`, `type`, `trailingPct`, `expiresAt` fields not in platform contract; schema now matches platform: `{ marketId, side, size, triggerPrice, limitPrice? }` (closes #24)
+- **BREAKING** `close_position`: `size` field changed from `z.number()` to `z.string()` to match platform NumberString format for partial closes (closes #30)
+- **BREAKING** `place_order`, `place_smart_order`: removed `.int()` restriction on size/totalSize — platform accepts decimal share amounts (closes #36)
+- Tool definitions (inputSchema) updated to match all schema changes above
+
 ## [1.6.9] — 2026-04-13
 
 ### Fixed
