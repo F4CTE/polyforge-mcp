@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.4] — 2026-04-14
+
+### Fixed
+- `run_backtest`: `dateRangeStart` and `dateRangeEnd` now validated as ISO 8601 date format (`YYYY-MM-DD`) instead of accepting arbitrary strings (closes #42)
+
 ## [1.7.3] — 2026-04-14
 
 ### Fixed

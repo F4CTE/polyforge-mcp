@@ -74,10 +74,12 @@ const placeOrderSchema = z.object({
   orderType: z.enum(["GTC", "GTD", "FOK"]).optional(),
 });
 
+const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
 const runBacktestSchema = z.object({
   strategyId: z.string().uuid(),
-  dateRangeStart: z.string().optional(),
-  dateRangeEnd: z.string().optional(),
+  dateRangeStart: z.string().regex(isoDateRegex, "Must be ISO 8601 date (YYYY-MM-DD)").optional(),
+  dateRangeEnd: z.string().regex(isoDateRegex, "Must be ISO 8601 date (YYYY-MM-DD)").optional(),
   quickMode: z.boolean().optional(),
   strategyBlocks: z.unknown().optional(),
   marketBindings: z.unknown().optional(),
