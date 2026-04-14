@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.5] — 2026-04-14
+
+### Security
+- **SSE buffer cap**: `pollStrategyEvents` now enforces a 1 MB maximum buffer size — large SSE payloads abort the connection instead of exhausting memory (closes #44)
+- **Startup env validation**: `POLYFORGE_API_KEY` and `POLYFORGE_API_URL` are now read once at module load and validated before `server.connect()`; missing key exits with a clear fatal error instead of failing silently per-call (closes #45)
+
 ## [1.7.4] — 2026-04-14
 
 ### Fixed
