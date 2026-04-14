@@ -130,10 +130,15 @@ const importStrategySchema = z.object({
 
 const createConditionalOrderSchema = z.object({
   marketId: z.string(),
+  tokenId: z.string(),
+  type: z.enum(["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"]),
   side: z.enum(["BUY", "SELL"]),
-  size: z.number().positive(),
-  triggerPrice: z.number().min(0).max(1),
-  limitPrice: z.number().min(0.001).max(0.999).optional(),
+  outcome: z.enum(["YES", "NO"]),
+  size: z.number().positive().min(1),
+  triggerPrice: z.number().min(0.001).max(1),
+  limitPrice: z.string().optional(),
+  trailingPct: z.string().optional(),
+  expiresAt: z.string().optional(),
 });
 
 const placeSmartOrderSchema = z.object({
@@ -655,12 +660,17 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         marketId: { type: "string", description: "Market UUID" },
+        tokenId: { type: "string", description: "Token ID for the outcome to trade" },
+        type: { type: "string", enum: ["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"], description: "Conditional order type" },
         side: { type: "string", enum: ["BUY", "SELL"], description: "Order side when triggered" },
-        size: { type: "number", description: "Number of shares (decimals accepted)" },
-        triggerPrice: { type: "number", description: "Price that triggers the order (0-1)" },
-        limitPrice: { type: "number", description: "Limit price for the order (0.001-0.999, optional)" },
+        outcome: { type: "string", enum: ["YES", "NO"], description: "Which outcome to trade" },
+        size: { type: "number", description: "Number of shares (minimum 1)" },
+        triggerPrice: { type: "number", description: "Price that triggers the order (0.001-1)" },
+        limitPrice: { type: "string", description: "Limit price as string (optional)" },
+        trailingPct: { type: "string", description: "Trailing percentage for TRAILING_STOP type (optional)" },
+        expiresAt: { type: "string", description: "ISO 8601 expiration timestamp (optional)" },
       },
-      required: ["marketId", "side", "size", "triggerPrice"],
+      required: ["marketId", "tokenId", "type", "side", "outcome", "size", "triggerPrice"],
     },
   },
   {
