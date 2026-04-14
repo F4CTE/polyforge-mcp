@@ -13,10 +13,41 @@ import { isIP } from "node:net";
 // ─── Input validation schemas (Zod) ──────────────────────────────
 // Validates all tool inputs before forwarding to the backend API.
 
+const blockSchema = z.object({
+  id: z.string().optional(),
+  type: z.string().max(100),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+
+const strategyVariableSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().max(50).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
+  expression: z.string().max(200),
+});
+
+const marketSlotSchema = z.object({
+  slot: z.string(),
+  label: z.string().optional(),
+  defaultMarketId: z.string().optional(),
+});
+
 const createStrategySchema = z.object({
-  name: z.string().min(1).max(200),
-  description: z.string().max(2000).optional(),
-  marketId: z.string().optional(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  marketId: z.string().max(255).optional(),
+  visibility: z.enum(["PRIVATE", "PUBLIC", "UNLISTED"]).optional(),
+  execMode: z.enum(["TICK", "EVENT", "HYBRID"]).optional(),
+  tickMs: z.number().int().min(200).max(60000).optional(),
+  triggers: z.array(blockSchema).max(50).optional(),
+  conditions: z.array(blockSchema).max(50).optional(),
+  actions: z.array(blockSchema).max(50).optional(),
+  safety: z.array(blockSchema).max(20).optional(),
+  logicBlocks: z.array(blockSchema).max(50).optional(),
+  calcBlocks: z.array(blockSchema).max(50).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  variables: z.array(strategyVariableSchema).max(20).optional(),
+  canvas: z.record(z.string(), z.unknown()).optional(),
+  marketSlots: z.array(marketSlotSchema).optional(),
 });
 
 const createStrategyFromDescriptionSchema = z.object({
@@ -61,10 +92,7 @@ const createAlertSchema = z.object({
 
 const updateStrategySchema = z.object({
   id: z.string().uuid(),
-  name: z.string().min(1).max(200).optional(),
-  description: z.string().max(2000).optional(),
-  marketId: z.string().optional(),
-});
+}).merge(createStrategySchema.partial());
 
 const closePositionSchema = z.object({
   tokenId: z.string().uuid(),
@@ -96,10 +124,7 @@ const startStrategySchema = z.object({
   mode: z.enum(["live", "paper"]).default("paper"),
 });
 
-const importBlockSchema = z.object({
-  type: z.string().max(100),
-  config: z.record(z.string(), z.unknown()).optional(),
-});
+const importBlockSchema = blockSchema.omit({ id: true });
 
 const importStrategySchema = z.object({
   polyforge: z.string().max(20),
@@ -300,27 +325,53 @@ const TOOLS = [
   },
   {
     name: "create_strategy",
-    description: "Create a new trading strategy with a name and optional description",
+    description: "Create a new trading strategy with blocks, execution mode, visibility, and tags",
     inputSchema: {
       type: "object" as const,
       properties: {
-        name: { type: "string", description: "Strategy name" },
-        description: { type: "string", description: "Strategy description" },
-        marketId: { type: "string", description: "Optional market ID to pin this strategy to a specific market" },
+        name: { type: "string", description: "Strategy name (max 100 chars)" },
+        description: { type: "string", description: "Strategy description (max 500 chars)" },
+        marketId: { type: "string", description: "Market ID to pin this strategy to" },
+        visibility: { type: "string", enum: ["PRIVATE", "PUBLIC", "UNLISTED"], description: "Strategy visibility (default: PRIVATE)" },
+        execMode: { type: "string", enum: ["TICK", "EVENT", "HYBRID"], description: "Execution mode (default: TICK)" },
+        tickMs: { type: "number", description: "Tick interval in ms (200-60000, default: 1000)" },
+        triggers: { type: "array", items: { type: "object" }, description: "Trigger blocks — when to evaluate the strategy" },
+        conditions: { type: "array", items: { type: "object" }, description: "Condition blocks — what must be true" },
+        actions: { type: "array", items: { type: "object" }, description: "Action blocks — what to do (place orders, etc.)" },
+        safety: { type: "array", items: { type: "object" }, description: "Safety blocks — circuit breakers and limits" },
+        logicBlocks: { type: "array", items: { type: "object" }, description: "Logic blocks — AND/OR/NOT combinators" },
+        calcBlocks: { type: "array", items: { type: "object" }, description: "Calculation blocks — computed values" },
+        tags: { type: "array", items: { type: "string" }, description: "Tags for organization (max 20)" },
+        variables: { type: "array", items: { type: "object" }, description: "Strategy variables with name and expression (max 20)" },
+        canvas: { type: "object", description: "Canvas layout metadata for the visual builder" },
+        marketSlots: { type: "array", items: { type: "object" }, description: "Parameterized market bindings" },
       },
       required: ["name"],
     },
   },
   {
     name: "update_strategy",
-    description: "Update a strategy's name, description, or pinned market",
+    description: "Update a strategy's configuration — blocks, execution mode, visibility, tags, and more",
     inputSchema: {
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Strategy UUID" },
-        name: { type: "string", description: "New strategy name" },
-        description: { type: "string", description: "New strategy description" },
-        marketId: { type: "string", description: "Market ID to pin strategy to (pass empty string to unpin)" },
+        name: { type: "string", description: "Strategy name (max 100 chars)" },
+        description: { type: "string", description: "Strategy description (max 500 chars)" },
+        marketId: { type: "string", description: "Market ID to pin strategy to (empty string to unpin)" },
+        visibility: { type: "string", enum: ["PRIVATE", "PUBLIC", "UNLISTED"], description: "Strategy visibility" },
+        execMode: { type: "string", enum: ["TICK", "EVENT", "HYBRID"], description: "Execution mode" },
+        tickMs: { type: "number", description: "Tick interval in ms (200-60000)" },
+        triggers: { type: "array", items: { type: "object" }, description: "Trigger blocks" },
+        conditions: { type: "array", items: { type: "object" }, description: "Condition blocks" },
+        actions: { type: "array", items: { type: "object" }, description: "Action blocks" },
+        safety: { type: "array", items: { type: "object" }, description: "Safety blocks" },
+        logicBlocks: { type: "array", items: { type: "object" }, description: "Logic blocks" },
+        calcBlocks: { type: "array", items: { type: "object" }, description: "Calculation blocks" },
+        tags: { type: "array", items: { type: "string" }, description: "Tags (max 20)" },
+        variables: { type: "array", items: { type: "object" }, description: "Strategy variables (max 20)" },
+        canvas: { type: "object", description: "Canvas layout metadata" },
+        marketSlots: { type: "array", items: { type: "object" }, description: "Parameterized market bindings" },
       },
       required: ["id"],
     },
@@ -950,7 +1001,7 @@ const ROUTES: Record<string, RouteConfig> = {
   list_strategies: { method: "GET", path: "/api/v1/strategies", schema: listStrategiesQuerySchema, query: (a) => pickDefined(a, ["status", "sort", "limit", "page"]) },
   get_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => createStrategySchema.parse(a) },
-  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const parsed = updateStrategySchema.parse(a); return pickDefined(parsed as Record<string, unknown>, ["name", "description", "marketId"]); } },
+  update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = updateStrategySchema.parse(a); return rest; } },
   create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => createStrategyFromDescriptionSchema.parse(a) },
   start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, schema: startStrategySchema, body: (a) => { const parsed = startStrategySchema.parse(a); return { mode: parsed.mode }; } },
   stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/stop`, schema: idSchema },

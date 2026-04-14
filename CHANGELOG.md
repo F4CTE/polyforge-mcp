@@ -4,6 +4,8 @@
 
 ### Fixed
 - `create_conditional_order`: add missing required `tokenId`, `type`, `outcome` params and optional `trailingPct`, `expiresAt` to match platform DTO (closes #94)
+- `create_strategy` / `update_strategy`: add missing block arrays, visibility, execMode, tickMs, tags, variables, canvas, and marketSlots parameters to match platform DTO (closes #95)
+- `update_strategy`: fix body handler to pass all fields instead of hardcoded pick list
 
 ## [1.7.2] — 2026-04-13
 
