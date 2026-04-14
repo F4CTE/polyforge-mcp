@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.3] — 2026-04-14
+
+### Fixed
+- `create_conditional_order`: add missing required `tokenId`, `type`, `outcome` params and optional `trailingPct`, `expiresAt` to match platform DTO (closes #94)
+
 ## [1.7.2] — 2026-04-13
 
 ### Added
