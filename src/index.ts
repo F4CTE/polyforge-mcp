@@ -10,6 +10,16 @@ import { z } from "zod";
 import { resolve4, resolve6 } from "node:dns/promises";
 import { isIP } from "node:net";
 
+// ─── Environment constants (validated at startup) ────────────────
+// Read once at module load; startup guard below rejects missing key.
+
+const POLYFORGE_API_URL = process.env.POLYFORGE_API_URL || "https://localhost:3002";
+const POLYFORGE_API_KEY = process.env.POLYFORGE_API_KEY;
+
+// ─── SSE safety constant ────────────────────────────────────────
+// Maximum bytes buffered from an SSE stream before aborting.
+const MAX_SSE_BUFFER_SIZE = 1_048_576; // 1 MB
+
 // ─── Input validation schemas (Zod) ──────────────────────────────
 // Validates all tool inputs before forwarding to the backend API.
 
@@ -1268,37 +1278,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
 
-  const apiUrl = process.env.POLYFORGE_API_URL || "https://localhost:3002";
-  const isLocalhostFallback = !process.env.POLYFORGE_API_URL;
-
-  if (isLocalhostFallback) {
-    console.error(
-      "[polyforge-mcp] WARNING: POLYFORGE_API_URL is not set — falling back to https://localhost:3002. " +
-      "Production deployments MUST set POLYFORGE_API_URL to the real API endpoint (e.g. https://api.polyforge.app). " +
-      "Using localhost with HTTPS requires a trusted certificate; do NOT set NODE_TLS_REJECT_UNAUTHORIZED=0 as a workaround."
-    );
-  }
-
-  // Validate API URL — reject non-HTTPS for non-localhost hosts
-  const parsedApiUrl = new URL(apiUrl);
-  if (
-    parsedApiUrl.protocol !== "https:" &&
-    parsedApiUrl.hostname !== "localhost" &&
-    parsedApiUrl.hostname !== "127.0.0.1"
-  ) {
-    return {
-      content: [{ type: "text", text: "Error: POLYFORGE_API_URL must use HTTPS for non-localhost hosts." }],
-      isError: true,
-    };
-  }
-  const apiKey = process.env.POLYFORGE_API_KEY;
-
-  if (!apiKey) {
-    return {
-      content: [{ type: "text", text: "Error: POLYFORGE_API_KEY environment variable is not set. Generate an API key in Polyforge Settings > API Keys." }],
-      isError: true,
-    };
-  }
+  const apiUrl = POLYFORGE_API_URL;
+  const apiKey = POLYFORGE_API_KEY!; // validated at startup — guaranteed non-empty
 
   // ── get_strategy_events: SSE polling (collect N events then return) ──────
   if (name === "get_strategy_events") {
@@ -1405,6 +1386,12 @@ async function pollStrategyEvents(
       if (done) break;
 
       buf += decoder.decode(value, { stream: true });
+
+      if (buf.length > MAX_SSE_BUFFER_SIZE) {
+        controller.abort();
+        throw new Error("SSE event exceeded maximum buffer size (1 MB)");
+      }
+
       const lines = buf.split("\n");
       buf = lines.pop() ?? "";
 
@@ -1527,6 +1514,36 @@ async function callApi(
   }
 
   throw new Error("Rate limited: max retries exceeded");
+}
+
+// ─── Startup validation ─────────────────────────────────────────
+
+if (!POLYFORGE_API_KEY) {
+  process.stderr.write(
+    "FATAL: POLYFORGE_API_KEY environment variable is required. " +
+    "Generate an API key in Polyforge Settings > API Keys.\n"
+  );
+  process.exit(1);
+}
+
+const parsedApiUrl = new URL(POLYFORGE_API_URL);
+if (
+  parsedApiUrl.protocol !== "https:" &&
+  parsedApiUrl.hostname !== "localhost" &&
+  parsedApiUrl.hostname !== "127.0.0.1"
+) {
+  process.stderr.write(
+    "FATAL: POLYFORGE_API_URL must use HTTPS for non-localhost hosts.\n"
+  );
+  process.exit(1);
+}
+
+if (!process.env.POLYFORGE_API_URL) {
+  process.stderr.write(
+    "[polyforge-mcp] WARNING: POLYFORGE_API_URL is not set — falling back to https://localhost:3002. " +
+    "Production deployments MUST set POLYFORGE_API_URL to the real API endpoint (e.g. https://api.polyforge.app). " +
+    "Using localhost with HTTPS requires a trusted certificate; do NOT set NODE_TLS_REJECT_UNAUTHORIZED=0 as a workaround.\n"
+  );
 }
 
 // ─── Start ─────────────────────────────────────────────────────────
