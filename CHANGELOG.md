@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.7] — 2026-04-15
+
+### Fixed
+- **list_markets sort enum** — remove 4 phantom values (`endDate`, `firstSeenAt`, `closing_soon`, `liquidity`), add missing `popular` sort option. (closes #103)
+- **get_portfolio_pnl period enum** — remove phantom `1d` value, fix `all` → `allTime` to match platform. (closes #102)
+
 ## [1.7.6] — 2026-04-15
 
 ### Security
