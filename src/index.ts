@@ -214,7 +214,7 @@ const marketIdParamSchema = z.object({ marketId: z.string().uuid() });
 const listMarketsQuerySchema = z.object({
   search: z.string().max(200).optional(),
   category: z.enum(["Sports", "Crypto", "Politics", "Science", "Culture"]).optional(),
-  sort: z.enum(["volume", "endDate", "firstSeenAt", "newest", "closing_soon", "liquidity"]).optional(),
+  sort: z.enum(["popular", "newest", "volume"]).optional(),
   closed: z.boolean().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).optional(),
@@ -248,7 +248,7 @@ const newsSignalsQuerySchema = z.object({
 });
 
 const portfolioPnlQuerySchema = z.object({
-  period: z.enum(["1d", "7d", "30d", "90d", "all"]).optional(),
+  period: z.enum(["7d", "30d", "90d", "allTime"]).optional(),
   strategyId: z.string().uuid().optional(),
 });
 
@@ -293,7 +293,7 @@ const TOOLS = [
       properties: {
         search: { type: "string", description: "Search query to filter markets by title" },
         category: { type: "string", enum: ["Sports", "Crypto", "Politics", "Science", "Culture"], description: "Filter by category" },
-        sort: { type: "string", enum: ["volume", "endDate", "firstSeenAt", "newest", "closing_soon", "liquidity"], description: "Sort order (default: volume)" },
+        sort: { type: "string", enum: ["popular", "newest", "volume"], description: "Sort order (default: popular)" },
         closed: { type: "boolean", description: "Include resolved/closed markets (default: false)" },
         limit: { type: "number", description: "Max results per page (default 10, max 100)" },
         page: { type: "number", description: "Page number (default 1)" },
