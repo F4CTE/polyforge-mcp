@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.6] — 2026-04-15
+
+### Security
+- Upgrade `hono` to 4.12.12+ and `@hono/node-server` to 1.19.13+ via pnpm update — fixes 6 moderate CVEs: cookie validation bypass, IP restriction bypass, path traversal in toSSG, and middleware bypass via repeated slashes (closes #100)
+
 ## [1.7.5] — 2026-04-14
 
 ### Security
