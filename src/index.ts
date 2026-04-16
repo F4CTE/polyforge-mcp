@@ -277,8 +277,80 @@ const browseMarketplaceQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 
+// ─── New tool schemas (closes #66) ──────────────────────────────
+
+const discoverStrategiesSchema = z.object({
+  sort: z.string().max(50).optional(),
+  category: z.string().max(100).optional(),
+  search: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+const leaderboardQuerySchema = z.object({
+  period: z.enum(["7d", "30d", "allTime"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+const topWhalesQuerySchema = z.object({
+  sort: z.enum(["volume", "pnl", "winRate", "tradeCount"]).optional(),
+  period: z.string().max(50).optional(),
+});
+
+const whaleAddressSchema = z.object({
+  address: z.string().min(1).max(100),
+});
+
+const createMarketplaceListingSchema = z.object({
+  strategyId: z.string().uuid(),
+  price: z.number().positive(),
+  description: z.string().max(1000).optional(),
+});
+
+const updateMarketplaceListingSchema = z.object({
+  id: z.string().uuid(),
+  price: z.number().positive().optional(),
+  description: z.string().max(1000).optional(),
+});
+
+const rateMarketplaceListingSchema = z.object({
+  id: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  review: z.string().max(2000).optional(),
+});
+
+const createCopyConfigSchema = z.object({
+  targetWallet: z.string().min(1).max(100),
+  mode: z.enum(["FIXED", "PROPORTIONAL"]).optional(),
+  sizeValue: z.number().positive().optional(),
+  maxExposure: z.number().positive().optional(),
+  maxDailyLoss: z.number().positive().optional(),
+  priceOffset: z.number().optional(),
+});
+
+const updateCopyConfigSchema = z.object({
+  id: z.string().uuid(),
+  mode: z.enum(["FIXED", "PROPORTIONAL"]).optional(),
+  sizeValue: z.number().positive().optional(),
+  maxExposure: z.number().positive().optional(),
+  maxDailyLoss: z.number().positive().optional(),
+  priceOffset: z.number().optional(),
+});
+
+const batchRequestItemSchema = z.object({
+  id: z.string().min(1).max(100),
+  method: z.enum(["GET", "POST", "PATCH", "DELETE"]),
+  path: z.string().min(1).max(500),
+  body: z.record(z.string(), z.unknown()).optional(),
+});
+
+const batchRequestsSchema = z.object({
+  requests: z.array(batchRequestItemSchema).min(1).max(50),
+});
+
 const server = new Server(
-  { name: "polyforge", version: "1.3.0" },
+  { name: "polyforge", version: "1.8.0" },
   { capabilities: { tools: {} } },
 );
 
@@ -995,6 +1067,269 @@ const TOOLS = [
       required: ["id"],
     },
   },
+  // ── Discovery & Ranking (closes #66) ────────────────────────────────
+  {
+    name: "discover_strategies",
+    description: "Discover and browse public strategies published by the community. Returns paginated results with sort, category, and search filters.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        sort: { type: "string", description: "Sort order (e.g. popular, newest, rating)" },
+        category: { type: "string", description: "Category filter (e.g. crypto, politics, sports)" },
+        search: { type: "string", description: "Search query to filter strategies by title or description" },
+        limit: { type: "number", description: "Max results per page (default 20, max 100)" },
+        offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+      },
+    },
+  },
+  {
+    name: "get_leaderboard",
+    description: "Get the top trader leaderboard ranked by P&L, win rate, or volume for a given time period.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        period: { type: "string", enum: ["7d", "30d", "allTime"], description: "Time period (default: 30d)" },
+        limit: { type: "number", description: "Max results (default 20, max 100)" },
+        offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+      },
+    },
+  },
+  // ── Paper Trading (closes #66) ─────────────────────────────────────
+  {
+    name: "get_paper_summary",
+    description: "Get your paper trading account summary — virtual balance, P&L, open positions, and performance metrics.",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "reset_paper_account",
+    description: "Reset your paper trading account to its initial virtual balance. All paper positions and history are cleared.",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+  // ── Batch API (closes #66) ─────────────────────────────────────────
+  {
+    name: "batch_requests",
+    description: "Execute multiple API requests in a single call. Useful for reading several resources at once or chaining related operations with minimal round-trips.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        requests: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Client-supplied request identifier echoed in the response" },
+              method: { type: "string", enum: ["GET", "POST", "PATCH", "DELETE"], description: "HTTP method" },
+              path: { type: "string", description: "API path, e.g. /api/v1/strategies" },
+              body: { type: "object", description: "Request body for POST/PATCH (optional)" },
+            },
+            required: ["id", "method", "path"],
+          },
+          description: "Array of requests to execute (max 50)",
+        },
+      },
+      required: ["requests"],
+    },
+  },
+  // ── Extended Whale Intelligence (closes #66) ───────────────────────
+  {
+    name: "get_top_whales",
+    description: "Get the top whale traders ranked by volume, P&L, win rate, or trade count for a given time period.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        sort: { type: "string", enum: ["volume", "pnl", "winRate", "tradeCount"], description: "Ranking metric (default: volume)" },
+        period: { type: "string", description: "Time period filter (e.g. 7d, 30d, allTime)" },
+      },
+    },
+  },
+  {
+    name: "get_whale_profile",
+    description: "Get the full trading profile for a specific whale wallet address — history, open positions, and performance stats.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        address: { type: "string", description: "Wallet address of the whale" },
+      },
+      required: ["address"],
+    },
+  },
+  {
+    name: "follow_whale",
+    description: "Follow a whale wallet to receive their trades in your whale feed.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        address: { type: "string", description: "Wallet address of the whale to follow" },
+      },
+      required: ["address"],
+    },
+  },
+  {
+    name: "unfollow_whale",
+    description: "Unfollow a whale wallet — their trades will no longer appear in your feed.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        address: { type: "string", description: "Wallet address of the whale to unfollow" },
+      },
+      required: ["address"],
+    },
+  },
+  {
+    name: "get_followed_whales",
+    description: "List all whale wallets you are currently following.",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+  // ── Marketplace Seller CRUD (closes #66) ───────────────────────────
+  {
+    name: "create_marketplace_listing",
+    description: "Publish one of your strategies to the Polyforge Strategy Marketplace. Set a price and optional description for buyers.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        strategyId: { type: "string", description: "UUID of the strategy to list" },
+        price: { type: "number", description: "Listing price in USDC (must be positive)" },
+        description: { type: "string", description: "Marketplace description shown to buyers (max 1000 chars, optional)" },
+      },
+      required: ["strategyId", "price"],
+    },
+  },
+  {
+    name: "update_marketplace_listing",
+    description: "Update the price or description of one of your marketplace listings.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Marketplace listing UUID" },
+        price: { type: "number", description: "New listing price in USDC (optional)" },
+        description: { type: "string", description: "Updated description (max 1000 chars, optional)" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "rate_marketplace_listing",
+    description: "Rate and review a marketplace strategy you have purchased. Rating must be between 1 and 5.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Marketplace listing UUID to rate" },
+        rating: { type: "number", description: "Star rating from 1 (lowest) to 5 (highest)" },
+        review: { type: "string", description: "Written review (max 2000 chars, optional)" },
+      },
+      required: ["id", "rating"],
+    },
+  },
+  {
+    name: "get_my_listings",
+    description: "List all marketplace strategies you have published as a seller, with sales count and revenue.",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "get_my_purchases",
+    description: "List all marketplace strategies you have purchased, including your forked copies.",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+  // ── Copy Trading CRUD (closes #66) ─────────────────────────────────
+  {
+    name: "create_copy_config",
+    description: "Create a new copy trading configuration to automatically mirror trades from a target wallet.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        targetWallet: { type: "string", description: "Wallet address to copy trades from" },
+        mode: { type: "string", enum: ["FIXED", "PROPORTIONAL"], description: "Position sizing mode: FIXED (fixed USDC per trade) or PROPORTIONAL (mirrors target's position size ratio)" },
+        sizeValue: { type: "number", description: "Fixed USDC amount per trade (FIXED mode) or multiplier (PROPORTIONAL mode)" },
+        maxExposure: { type: "number", description: "Maximum total USDC exposure across all copied positions (optional)" },
+        maxDailyLoss: { type: "number", description: "Maximum daily loss in USDC before copy trading is paused (optional)" },
+        priceOffset: { type: "number", description: "Price slippage offset to apply when entering copied trades (optional)" },
+      },
+      required: ["targetWallet"],
+    },
+  },
+  {
+    name: "get_copy_config",
+    description: "Get details of a specific copy trading configuration including status, target wallet, and risk limits.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Copy config UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "update_copy_config",
+    description: "Update the sizing mode, risk limits, or price offset for an existing copy trading configuration.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Copy config UUID" },
+        mode: { type: "string", enum: ["FIXED", "PROPORTIONAL"], description: "Position sizing mode" },
+        sizeValue: { type: "number", description: "Fixed size or proportional multiplier" },
+        maxExposure: { type: "number", description: "Maximum total USDC exposure (optional)" },
+        maxDailyLoss: { type: "number", description: "Maximum daily loss limit in USDC (optional)" },
+        priceOffset: { type: "number", description: "Price offset for copied entries (optional)" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "pause_copy_config",
+    description: "Pause a copy trading configuration. No new trades will be copied until it is resumed.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Copy config UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "resume_copy_config",
+    description: "Resume a paused copy trading configuration.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Copy config UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_copy_config",
+    description: "Permanently delete a copy trading configuration. Open positions copied from this config are NOT automatically closed.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Copy config UUID to delete" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "get_copy_trades",
+    description: "List all trades executed under a specific copy trading configuration.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Copy config UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  // ── Backtest Orders (closes #66) ────────────────────────────────────
+  {
+    name: "get_backtest_orders",
+    description: "Get the simulated order log for a completed backtest — all fills, sizes, and prices generated during the backtest run.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Backtest UUID" },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -1069,6 +1404,36 @@ const ROUTES: Record<string, RouteConfig> = {
   split_position: { method: "POST", path: "/api/v1/orders/split", body: (a) => splitPositionSchema.parse(a) },
   merge_position: { method: "POST", path: "/api/v1/orders/merge", body: (a) => mergePositionSchema.parse(a) },
   get_marketplace_listing: { method: "GET", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+  // Discovery & Ranking (closes #66)
+  discover_strategies: { method: "GET", path: "/api/v1/discover", schema: discoverStrategiesSchema, query: (a) => pickDefined(a, ["sort", "category", "search", "limit", "offset"]) },
+  get_leaderboard: { method: "GET", path: "/api/v1/leaderboard", schema: leaderboardQuerySchema, query: (a) => pickDefined(a, ["period", "limit", "offset"]) },
+  // Paper Trading (closes #66)
+  get_paper_summary: { method: "GET", path: "/api/v1/paper/summary" },
+  reset_paper_account: { method: "POST", path: "/api/v1/paper/reset" },
+  // Batch API (closes #66)
+  batch_requests: { method: "POST", path: "/api/v1/batch", body: (a) => ({ requests: batchRequestsSchema.parse(a).requests }) },
+  // Extended Whale Intelligence (closes #66)
+  get_top_whales: { method: "GET", path: "/api/v1/whales/top", schema: topWhalesQuerySchema, query: (a) => pickDefined(a, ["sort", "period"]) },
+  get_whale_profile: { method: "GET", path: (a) => `/api/v1/whales/${encodeURIComponent(String(a.address))}`, schema: whaleAddressSchema },
+  follow_whale: { method: "POST", path: (a) => `/api/v1/whales/${encodeURIComponent(String(a.address))}/follow`, schema: whaleAddressSchema },
+  unfollow_whale: { method: "POST", path: (a) => `/api/v1/whales/${encodeURIComponent(String(a.address))}/unfollow`, schema: whaleAddressSchema },
+  get_followed_whales: { method: "GET", path: "/api/v1/whales/following" },
+  // Marketplace Seller CRUD (closes #66)
+  create_marketplace_listing: { method: "POST", path: "/api/v1/marketplace", body: (a) => createMarketplaceListingSchema.parse(a) },
+  update_marketplace_listing: { method: "PATCH", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = updateMarketplaceListingSchema.parse(a); return rest; } },
+  rate_marketplace_listing: { method: "POST", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}/rate`, body: (a) => { const { id: _id, ...rest } = rateMarketplaceListingSchema.parse(a); return rest; } },
+  get_my_listings: { method: "GET", path: "/api/v1/marketplace/my/listings" },
+  get_my_purchases: { method: "GET", path: "/api/v1/marketplace/my/purchases" },
+  // Copy Trading CRUD (closes #66)
+  create_copy_config: { method: "POST", path: "/api/v1/copy", body: (a) => createCopyConfigSchema.parse(a) },
+  get_copy_config: { method: "GET", path: (a) => `/api/v1/copy/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+  update_copy_config: { method: "PATCH", path: (a) => `/api/v1/copy/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = updateCopyConfigSchema.parse(a); return rest; } },
+  pause_copy_config: { method: "POST", path: (a) => `/api/v1/copy/${encodeURIComponent(String(a.id))}/pause`, schema: idSchema },
+  resume_copy_config: { method: "POST", path: (a) => `/api/v1/copy/${encodeURIComponent(String(a.id))}/resume`, schema: idSchema },
+  delete_copy_config: { method: "DELETE", path: (a) => `/api/v1/copy/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+  get_copy_trades: { method: "GET", path: (a) => `/api/v1/copy/${encodeURIComponent(String(a.id))}/trades`, schema: idSchema },
+  // Backtest Orders (closes #66)
+  get_backtest_orders: { method: "GET", path: (a) => `/api/v1/backtests/${encodeURIComponent(String(a.id))}/orders`, schema: idSchema },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 

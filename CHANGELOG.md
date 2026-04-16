@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.8.0] — 2026-04-16
+
+### Added
+- **Discovery & Ranking** — `discover_strategies` (browse public community strategies), `get_leaderboard` (top trader rankings by P&L/volume/win-rate) (closes #66)
+- **Paper Trading** — `get_paper_summary` (virtual account balance and P&L), `reset_paper_account` (clear paper account to initial state) (closes #66)
+- **Batch API** — `batch_requests` (execute up to 50 API requests in a single call) (closes #66)
+- **Extended Whale Intelligence** — `get_top_whales`, `get_whale_profile`, `follow_whale`, `unfollow_whale`, `get_followed_whales` (closes #66)
+- **Marketplace Seller CRUD** — `create_marketplace_listing`, `update_marketplace_listing`, `rate_marketplace_listing`, `get_my_listings`, `get_my_purchases` (closes #66)
+- **Copy Trading CRUD** — `create_copy_config`, `get_copy_config`, `update_copy_config`, `pause_copy_config`, `resume_copy_config`, `delete_copy_config`, `get_copy_trades` (closes #66)
+- **Backtest Orders** — `get_backtest_orders` (simulated order log for a completed backtest) (closes #66)
+
 ## [1.7.7] — 2026-04-15
 
 ### Fixed
