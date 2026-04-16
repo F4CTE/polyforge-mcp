@@ -71,8 +71,8 @@ const createWebhookSchema = z.object({
 });
 
 const aiQuerySchema = z.object({
-  query: z.string().min(1).max(5000),
-  context: z.string().max(5000).optional(),
+  query: z.string().min(1).max(500),
+  context: z.string().max(500).optional(),
 });
 
 const placeOrderSchema = z.object({
@@ -162,8 +162,10 @@ const mergePositionSchema = z.object({
 });
 
 const provideLiquiditySchema = z.object({
-  marketId: z.string().uuid(),     // #107 — enforce UUID
-  size: z.number().positive(),
+  marketId: z.string(),
+  tokenId: z.string(),
+  amountUsdc: z.number().positive(),
+  targetSpread: z.number().min(0).max(1).optional(),
 });
 
 const startStrategySchema = z.object({
@@ -384,6 +386,41 @@ const batchRequestItemSchema = z.object({
 
 const batchRequestsSchema = z.object({
   requests: z.array(batchRequestItemSchema).min(1).max(50),
+});
+
+// ─── POLA-104 compat fix schemas ──────────────────────────────────
+
+const getPriceHistorySchema = z.object({
+  marketId: z.string(),
+  resolution: z.enum(["1m", "1h", "1d"]).optional(),
+  from: z.string().max(50).optional(),
+  to: z.string().max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
+
+const addStrategyCommentSchema = z.object({
+  id: z.string().uuid(),
+  body: z.string().min(1).max(1000),
+});
+
+const deleteStrategyCommentSchema = z.object({
+  id: z.string().uuid(),
+  commentId: z.string().uuid(),
+});
+
+const reportStrategySchema = z.object({
+  id: z.string().uuid(),
+  reason: z.string().min(1).max(500),
+});
+
+const rollbackStrategySchema = z.object({
+  id: z.string().uuid(),
+  versionId: z.string().uuid(),
+});
+
+const createApiKeySchema = z.object({
+  name: z.string().min(1).max(100),
+  expiresAt: z.string().max(50).optional(),
 });
 
 const server = new Server(
@@ -967,10 +1004,12 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        marketId: { type: "string", description: "Market UUID to provide liquidity for" },
-        size: { type: "number", description: "Size in USDC to provide" },
+        marketId: { type: "string", description: "Market condition ID to provide liquidity for" },
+        tokenId: { type: "string", description: "Token ID (YES or NO side) to provide liquidity on" },
+        amountUsdc: { type: "number", description: "Amount of USDC.e to deposit as liquidity" },
+        targetSpread: { type: "number", description: "Target bid-ask spread (0–1, optional)" },
       },
-      required: ["marketId", "size"],
+      required: ["marketId", "tokenId", "amountUsdc"],
     },
   },
   {
@@ -1367,6 +1406,168 @@ const TOOLS = [
       required: ["id"],
     },
   },
+
+  // ── Price history (#126) ──────────────────────────────────────────────────
+  {
+    name: "get_price_history",
+    description: "Get historical price data for a market token. Supports candle resolutions of 1m, 1h, or 1d with optional date range filtering.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        marketId: { type: "string", description: "Market condition ID" },
+        resolution: { type: "string", enum: ["1m", "1h", "1d"], description: "Candle resolution (default: 1h)" },
+        from: { type: "string", description: "Start date/time in ISO 8601 format (e.g. 2026-01-01T00:00:00Z)" },
+        to: { type: "string", description: "End date/time in ISO 8601 format (e.g. 2026-01-31T23:59:59Z)" },
+        limit: { type: "number", description: "Max data points to return (default: 100, max: 1000)" },
+      },
+      required: ["marketId"],
+    },
+  },
+
+  // ── Strategy social (#126) ────────────────────────────────────────────────
+  {
+    name: "like_strategy",
+    description: "Like a public strategy. Returns the updated like count.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID to like" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "list_strategy_comments",
+    description: "List comments on a public strategy.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+        page: { type: "number", description: "Page number (default: 1)" },
+        limit: { type: "number", description: "Results per page (default: 20, max: 100)" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "add_strategy_comment",
+    description: "Post a comment on a public strategy.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID to comment on" },
+        body: { type: "string", description: "Comment text (max 1000 chars)" },
+      },
+      required: ["id", "body"],
+    },
+  },
+  {
+    name: "delete_strategy_comment",
+    description: "Delete one of your own comments on a strategy.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+        commentId: { type: "string", description: "Comment UUID to delete" },
+      },
+      required: ["id", "commentId"],
+    },
+  },
+  {
+    name: "list_strategy_children",
+    description: "List strategies that were forked from a given strategy.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+        page: { type: "number", description: "Page number (default: 1)" },
+        limit: { type: "number", description: "Results per page (default: 20, max: 100)" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "report_strategy",
+    description: "Report a public strategy for violating community guidelines.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID to report" },
+        reason: { type: "string", description: "Reason for the report (max 500 chars)" },
+      },
+      required: ["id", "reason"],
+    },
+  },
+
+  // ── Strategy versioning (#126) ────────────────────────────────────────────
+  {
+    name: "list_strategy_versions",
+    description: "List the saved version history of a strategy.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "rollback_strategy",
+    description: "Roll a strategy back to a previously saved version.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+        versionId: { type: "string", description: "Version UUID to restore" },
+      },
+      required: ["id", "versionId"],
+    },
+  },
+
+  // ── Strategy event log (#126) ─────────────────────────────────────────────
+  {
+    name: "get_strategy_event_log",
+    description: "Get the persistent audit event log for a strategy (execution history, parameter changes, starts/stops).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Strategy UUID" },
+        page: { type: "number", description: "Page number (default: 1)" },
+        limit: { type: "number", description: "Results per page (default: 20, max: 100)" },
+      },
+      required: ["id"],
+    },
+  },
+
+  // ── API key management (#126) ─────────────────────────────────────────────
+  {
+    name: "list_api_keys",
+    description: "List all API keys associated with your account.",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "create_api_key",
+    description: "Create a new API key for programmatic access.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Descriptive label for the key (max 100 chars)" },
+        expiresAt: { type: "string", description: "Expiry in ISO 8601 format (optional — no expiry if omitted)" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "revoke_api_key",
+    description: "Permanently revoke an API key. This cannot be undone.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "API key UUID to revoke" },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -1409,7 +1610,7 @@ const ROUTES: Record<string, RouteConfig> = {
   list_watchlist: { method: "GET", path: "/api/v1/watchlist" },
   add_to_watchlist: { method: "POST", path: "/api/v1/watchlist", body: (a) => marketIdParamSchema.parse(a) },
   remove_from_watchlist: { method: "DELETE", path: (a) => `/api/v1/watchlist/${encodeURIComponent(String(a.marketId))}`, schema: marketIdParamSchema },
-  get_watchlist_status: { method: "GET", path: (a) => `/api/v1/watchlist/status/${encodeURIComponent(String(a.marketId))}`, schema: marketIdParamSchema },
+  get_watchlist_status: { method: "GET", path: (a) => `/api/v1/watchlist/${encodeURIComponent(String(a.marketId))}/status`, schema: marketIdParamSchema },
   ai_query: { method: "POST", path: "/api/v1/ai/query", body: (a) => aiQuerySchema.parse(a) },
   place_order: { method: "POST", path: "/api/v1/orders/place", body: (a) => placeOrderSchema.parse(a) },
   cancel_order: { method: "DELETE", path: (a) => `/api/v1/orders/${encodeURIComponent(String(a.id))}`, schema: idSchema },
@@ -1471,6 +1672,24 @@ const ROUTES: Record<string, RouteConfig> = {
   get_copy_trades: { method: "GET", path: (a) => `/api/v1/copy/${encodeURIComponent(String(a.id))}/trades`, schema: idSchema },
   // Backtest Orders (closes #66)
   get_backtest_orders: { method: "GET", path: (a) => `/api/v1/backtests/${encodeURIComponent(String(a.id))}/orders`, schema: idSchema },
+  // Price history (#126)
+  get_price_history: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.marketId))}/price-history`, schema: getPriceHistorySchema, query: (a) => pickDefined(a, ["resolution", "from", "to", "limit"]) },
+  // Strategy social (#126)
+  like_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/like`, schema: idSchema },
+  list_strategy_comments: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, query: (a) => pickDefined(a, ["page", "limit"]) },
+  add_strategy_comment: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, schema: addStrategyCommentSchema, body: (a) => { const parsed = addStrategyCommentSchema.parse(a); return { body: parsed.body }; } },
+  delete_strategy_comment: { method: "DELETE", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments/${encodeURIComponent(String(a.commentId))}`, schema: deleteStrategyCommentSchema },
+  list_strategy_children: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/children`, query: (a) => pickDefined(a, ["page", "limit"]) },
+  report_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/report`, schema: reportStrategySchema, body: (a) => { const parsed = reportStrategySchema.parse(a); return { reason: parsed.reason }; } },
+  // Strategy versioning (#126)
+  list_strategy_versions: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/versions`, schema: idSchema },
+  rollback_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/versions/${encodeURIComponent(String(a.versionId))}/rollback`, schema: rollbackStrategySchema },
+  // Strategy event log (#126)
+  get_strategy_event_log: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/event-log`, query: (a) => pickDefined(a, ["page", "limit"]) },
+  // API key management (#126)
+  list_api_keys: { method: "GET", path: "/api/v1/api-keys" },
+  create_api_key: { method: "POST", path: "/api/v1/api-keys", body: (a) => createApiKeySchema.parse(a) },
+  revoke_api_key: { method: "DELETE", path: (a) => `/api/v1/api-keys/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
