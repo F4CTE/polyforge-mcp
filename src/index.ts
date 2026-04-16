@@ -86,19 +86,54 @@ const placeOrderSchema = z.object({
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
+// ─── Reusable numeric-string validators (#108) ────────────────────
+// These validate fields the backend API accepts as decimal strings
+// (e.g. USDC amounts, percentage rates) rather than JS numbers.
+
+/** Accepts a positive decimal string such as "100.5" or "1000". */
+const positiveDecimalString = z
+  .string()
+  .regex(/^\d+(\.\d+)?$/, "Must be a positive decimal number")
+  .refine((v) => parseFloat(v) > 0, { message: "Must be greater than zero" });
+
+/** Accepts a Polymarket probability price string: "0.001" – "0.999". */
+const priceDecimalString = z
+  .string()
+  .regex(/^0\.\d+$/, "Must be a decimal probability string (e.g. '0.65')")
+  .refine(
+    (v) => { const n = parseFloat(v); return n >= 0.001 && n <= 0.999; },
+    { message: "Price must be between 0.001 and 0.999" },
+  );
+
+/** Accepts a trailing-stop percentage string: positive decimal up to 100. */
+const pctDecimalString = z
+  .string()
+  .regex(/^\d+(\.\d+)?$/, "Must be a positive decimal percentage")
+  .refine((v) => parseFloat(v) > 0 && parseFloat(v) <= 100, {
+    message: "Percentage must be between 0 and 100",
+  });
+
 const runBacktestSchema = z.object({
   strategyId: z.string().uuid(),
   dateRangeStart: z.string().regex(isoDateRegex, "Must be ISO 8601 date (YYYY-MM-DD)").optional(),
   dateRangeEnd: z.string().regex(isoDateRegex, "Must be ISO 8601 date (YYYY-MM-DD)").optional(),
   quickMode: z.boolean().optional(),
-  strategyBlocks: z.unknown().optional(),
-  marketBindings: z.unknown().optional(),
+  // Concrete block structure prevents arbitrary payload forwarding (#110)
+  strategyBlocks: z.object({
+    triggers: z.array(blockSchema).max(50).optional(),
+    conditions: z.array(blockSchema).max(50).optional(),
+    actions: z.array(blockSchema).max(50).optional(),
+    safety: z.array(blockSchema).max(20).optional(),
+    logicBlocks: z.array(blockSchema).max(50).optional(),
+    calcBlocks: z.array(blockSchema).max(50).optional(),
+  }).optional(),
+  marketBindings: z.record(z.string().max(100), z.string().uuid()).optional(),
 });
 
 const createAlertSchema = z.object({
-  tokenId: z.string(),
+  tokenId: z.string().uuid(),         // #107 — enforce UUID
   direction: z.enum(["above", "below"]),
-  price: z.string(),
+  price: priceDecimalString,          // #108 — validate probability range
   persistent: z.boolean().optional(),
 });
 
@@ -108,26 +143,26 @@ const updateStrategySchema = z.object({
 
 const closePositionSchema = z.object({
   tokenId: z.string().uuid(),
-  size: z.string().optional(),
+  size: positiveDecimalString.optional(),  // #108 — validate positive decimal
 });
 
 const redeemPositionSchema = z.object({
   positionId: z.string().uuid().optional(),
-  marketId: z.string().optional(),
+  marketId: z.string().uuid().optional(),  // #107 — enforce UUID
 });
 
 const splitPositionSchema = z.object({
-  tokenId: z.string(),
-  amount: z.string(),
+  tokenId: z.string().uuid(),      // #107 — enforce UUID
+  amount: positiveDecimalString,   // #108 — validate positive decimal
 });
 
 const mergePositionSchema = z.object({
-  tokenId: z.string(),
-  amount: z.string(),
+  tokenId: z.string().uuid(),      // #107 — enforce UUID
+  amount: positiveDecimalString,   // #108 — validate positive decimal
 });
 
 const provideLiquiditySchema = z.object({
-  marketId: z.string(),
+  marketId: z.string().uuid(),     // #107 — enforce UUID
   size: z.number().positive(),
 });
 
@@ -165,17 +200,19 @@ const importStrategySchema = z.object({
   }),
 });
 
+const isoDatetimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
 const createConditionalOrderSchema = z.object({
-  marketId: z.string(),
-  tokenId: z.string(),
+  marketId: z.string().uuid(),     // #107 — enforce UUID
+  tokenId: z.string().uuid(),      // #107 — enforce UUID
   type: z.enum(["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"]),
   side: z.enum(["BUY", "SELL"]),
   outcome: z.enum(["YES", "NO"]),
   size: z.number().positive().min(1),
   triggerPrice: z.number().min(0.001).max(1),
-  limitPrice: z.string().optional(),
-  trailingPct: z.string().optional(),
-  expiresAt: z.string().optional(),
+  limitPrice: priceDecimalString.optional(),  // #108 — validate probability range
+  trailingPct: pctDecimalString.optional(),   // #108 — validate percentage range
+  expiresAt: z.string().regex(isoDatetimeRegex, "Must be ISO 8601 datetime").optional(),
 });
 
 const placeSmartOrderSchema = z.object({
@@ -744,9 +781,9 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        tokenId: { type: "string", description: "Token ID to monitor" },
+        tokenId: { type: "string", description: "Token UUID to monitor" },
         direction: { type: "string", enum: ["above", "below"], description: "Alert when price goes above or below threshold" },
-        price: { type: "string", description: "Price threshold as a decimal string (e.g. '0.65')" },
+        price: { type: "string", description: "Price threshold as a decimal probability string between 0.001 and 0.999 (e.g. '0.65')" },
         persistent: { type: "boolean", description: "If true, alert re-arms after triggering (default false)" },
       },
       required: ["tokenId", "direction", "price"],
@@ -769,8 +806,8 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        tokenId: { type: "string", description: "Token ID of the position to close" },
-        size: { type: "string", description: "Size to close (optional, defaults to full position)" },
+        tokenId: { type: "string", description: "Token UUID of the position to close" },
+        size: { type: "string", description: "Size to close as a positive decimal string (optional, defaults to full position)" },
       },
       required: ["tokenId"],
     },
@@ -795,15 +832,15 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         marketId: { type: "string", description: "Market UUID" },
-        tokenId: { type: "string", description: "Token ID for the outcome to trade" },
+        tokenId: { type: "string", description: "Token UUID for the outcome to trade" },
         type: { type: "string", enum: ["TAKE_PROFIT", "STOP_LOSS", "TRAILING_STOP", "LIMIT", "PEGGED"], description: "Conditional order type" },
         side: { type: "string", enum: ["BUY", "SELL"], description: "Order side when triggered" },
         outcome: { type: "string", enum: ["YES", "NO"], description: "Which outcome to trade" },
         size: { type: "number", description: "Number of shares (minimum 1)" },
         triggerPrice: { type: "number", description: "Price that triggers the order (0.001-1)" },
-        limitPrice: { type: "string", description: "Limit price as string (optional)" },
-        trailingPct: { type: "string", description: "Trailing percentage for TRAILING_STOP type (optional)" },
-        expiresAt: { type: "string", description: "ISO 8601 expiration timestamp (optional)" },
+        limitPrice: { type: "string", description: "Limit price as probability decimal string 0.001–0.999 (optional)" },
+        trailingPct: { type: "string", description: "Trailing percentage 0–100 as decimal string for TRAILING_STOP type (optional)" },
+        expiresAt: { type: "string", description: "ISO 8601 expiration datetime (optional, e.g. '2025-12-31T23:59:59Z')" },
       },
       required: ["marketId", "tokenId", "type", "side", "outcome", "size", "triggerPrice"],
     },
@@ -930,7 +967,7 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        marketId: { type: "string", description: "Market ID to provide liquidity for" },
+        marketId: { type: "string", description: "Market UUID to provide liquidity for" },
         size: { type: "number", description: "Size in USDC to provide" },
       },
       required: ["marketId", "size"],
@@ -1028,7 +1065,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         positionId: { type: "string", description: "Position UUID to redeem (optional if marketId is provided)" },
-        marketId: { type: "string", description: "Market ID to redeem all resolved positions for (optional if positionId is provided)" },
+        marketId: { type: "string", description: "Market UUID to redeem all resolved positions for (optional if positionId is provided)" },
       },
     },
   },
@@ -1038,8 +1075,8 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        tokenId: { type: "string", description: "Token ID of the market to split into" },
-        amount: { type: "string", description: "Amount of USDC.e to split (decimal string, e.g. '100.5')" },
+        tokenId: { type: "string", description: "Token UUID of the market to split into" },
+        amount: { type: "string", description: "Amount of USDC.e to split as positive decimal string (e.g. '100.5')" },
       },
       required: ["tokenId", "amount"],
     },
@@ -1050,8 +1087,8 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        tokenId: { type: "string", description: "Token ID of the market to merge from" },
-        amount: { type: "string", description: "Amount of token pairs to merge (decimal string, e.g. '100.5')" },
+        tokenId: { type: "string", description: "Token UUID of the market to merge from" },
+        amount: { type: "string", description: "Amount of token pairs to merge as positive decimal string (e.g. '100.5')" },
       },
       required: ["tokenId", "amount"],
     },
@@ -1733,10 +1770,16 @@ async function pollStrategyEvents(
 
   if (!res.ok) {
     clearTimeout(timeout);
-    const raw = await res.text().catch(() => "");
-    // Truncate error body to avoid information disclosure
-    const sanitized = raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
-    throw new Error(`${res.status} ${res.statusText}: ${sanitized}`);
+    // Extract only a structured message field to prevent raw API body disclosure (#109)
+    let errMsg: string;
+    try {
+      const body = await res.json() as { message?: unknown; error?: unknown };
+      const field = body.message ?? body.error;
+      errMsg = typeof field === "string" ? field.slice(0, 200) : `Request failed with status ${res.status}`;
+    } catch {
+      errMsg = `Request failed with status ${res.status}`;
+    }
+    throw new Error(errMsg);
   }
 
   const events: unknown[] = [];
@@ -1866,10 +1909,16 @@ async function callApi(
     }
 
     if (!res.ok) {
-      const raw = await res.text().catch(() => "");
-      // Truncate error body to prevent information disclosure
-      const sanitized = raw.length > 200 ? raw.slice(0, 200) + "…" : raw;
-      throw new Error(`${res.status} ${res.statusText}: ${sanitized}`);
+      // Extract only a structured message field to prevent raw API body disclosure (#109)
+      let errMsg: string;
+      try {
+        const body = await res.json() as { message?: unknown; error?: unknown };
+        const field = body.message ?? body.error;
+        errMsg = typeof field === "string" ? field.slice(0, 200) : `Request failed with status ${res.status}`;
+      } catch {
+        errMsg = `Request failed with status ${res.status}`;
+      }
+      throw new Error(errMsg);
     }
 
     if (res.status === 204) {
