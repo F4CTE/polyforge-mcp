@@ -323,13 +323,13 @@ const discoverStrategiesSchema = z.object({
   category: z.string().max(100).optional(),
   search: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
-  offset: z.coerce.number().int().min(0).optional(),
+  page: z.coerce.number().int().min(1).optional(),
 });
 
 const leaderboardQuerySchema = z.object({
   period: z.enum(["7d", "30d", "allTime"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
-  offset: z.coerce.number().int().min(0).optional(),
+  page: z.coerce.number().int().min(1).optional(),
 });
 
 const topWhalesQuerySchema = z.object({
@@ -343,8 +343,10 @@ const whaleAddressSchema = z.object({
 
 const createMarketplaceListingSchema = z.object({
   strategyId: z.string().uuid(),
-  price: z.number().positive(),
+  title: z.string().min(1).max(200),
+  priceUsdc: z.number().positive(),
   description: z.string().max(1000).optional(),
+  tags: z.array(z.string()).max(20).optional(),
 });
 
 const updateMarketplaceListingSchema = z.object({
@@ -361,7 +363,7 @@ const rateMarketplaceListingSchema = z.object({
 
 const createCopyConfigSchema = z.object({
   targetWallet: z.string().min(1).max(100),
-  mode: z.enum(["FIXED", "PROPORTIONAL"]).optional(),
+  mode: z.enum(["PERCENTAGE", "FIXED", "MIRROR"]).optional(),
   sizeValue: z.number().positive().optional(),
   maxExposure: z.number().positive().optional(),
   maxDailyLoss: z.number().positive().optional(),
@@ -370,7 +372,7 @@ const createCopyConfigSchema = z.object({
 
 const updateCopyConfigSchema = z.object({
   id: z.string().uuid(),
-  mode: z.enum(["FIXED", "PROPORTIONAL"]).optional(),
+  mode: z.enum(["PERCENTAGE", "FIXED", "MIRROR"]).optional(),
   sizeValue: z.number().positive().optional(),
   maxExposure: z.number().positive().optional(),
   maxDailyLoss: z.number().positive().optional(),
@@ -385,7 +387,7 @@ const batchRequestItemSchema = z.object({
 });
 
 const batchRequestsSchema = z.object({
-  requests: z.array(batchRequestItemSchema).min(1).max(50),
+  requests: z.array(batchRequestItemSchema).min(1).max(10),
 });
 
 // ─── POLA-104 compat fix schemas ──────────────────────────────────
@@ -400,7 +402,7 @@ const getPriceHistorySchema = z.object({
 
 const addStrategyCommentSchema = z.object({
   id: z.string().uuid(),
-  body: z.string().min(1).max(1000),
+  content: z.string().min(1).max(2000),
 });
 
 const deleteStrategyCommentSchema = z.object({
@@ -410,7 +412,8 @@ const deleteStrategyCommentSchema = z.object({
 
 const reportStrategySchema = z.object({
   id: z.string().uuid(),
-  reason: z.string().min(1).max(500),
+  reason: z.enum(["SPAM", "MISLEADING", "HARMFUL", "OTHER"]),
+  description: z.string().max(1000).optional(),
 });
 
 const rollbackStrategySchema = z.object({
@@ -421,6 +424,7 @@ const rollbackStrategySchema = z.object({
 const createApiKeySchema = z.object({
   name: z.string().min(1).max(100),
   expiresAt: z.string().max(50).optional(),
+  scopes: z.array(z.enum(["READ", "WRITE", "TRADE", "STRATEGY", "WEBHOOK"])).optional(),
 });
 
 const updateRiskSettingsSchema = z.object({
@@ -1160,7 +1164,7 @@ const TOOLS = [
         category: { type: "string", description: "Category filter (e.g. crypto, politics, sports)" },
         search: { type: "string", description: "Search query to filter strategies by title or description" },
         limit: { type: "number", description: "Max results per page (default 20, max 100)" },
-        offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+        page: { type: "number", description: "Page number for pagination (default 1)" },
       },
     },
   },
@@ -1172,7 +1176,7 @@ const TOOLS = [
       properties: {
         period: { type: "string", enum: ["7d", "30d", "allTime"], description: "Time period (default: 30d)" },
         limit: { type: "number", description: "Max results (default 20, max 100)" },
-        offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+        page: { type: "number", description: "Page number for pagination (default 1)" },
       },
     },
   },
@@ -1206,7 +1210,7 @@ const TOOLS = [
             },
             required: ["id", "method", "path"],
           },
-          description: "Array of requests to execute (max 50)",
+          description: "Array of requests to execute (max 10)",
         },
       },
       required: ["requests"],
@@ -1270,10 +1274,12 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         strategyId: { type: "string", description: "UUID of the strategy to list" },
-        price: { type: "number", description: "Listing price in USDC (must be positive)" },
+        title: { type: "string", description: "Listing title shown to buyers (max 200 chars)" },
+        priceUsdc: { type: "number", description: "Listing price in USDC (must be positive)" },
         description: { type: "string", description: "Marketplace description shown to buyers (max 1000 chars, optional)" },
+        tags: { type: "array", items: { type: "string" }, description: "Tags for discoverability (max 20, optional)" },
       },
-      required: ["strategyId", "price"],
+      required: ["strategyId", "title", "priceUsdc"],
     },
   },
   {
@@ -1320,7 +1326,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         targetWallet: { type: "string", description: "Wallet address to copy trades from" },
-        mode: { type: "string", enum: ["FIXED", "PROPORTIONAL"], description: "Position sizing mode: FIXED (fixed USDC per trade) or PROPORTIONAL (mirrors target's position size ratio)" },
+        mode: { type: "string", enum: ["PERCENTAGE", "FIXED", "MIRROR"], description: "Position sizing mode: PERCENTAGE (percentage of portfolio), FIXED (fixed USDC per trade), or MIRROR (mirrors target's position size)" },
         sizeValue: { type: "number", description: "Fixed USDC amount per trade (FIXED mode) or multiplier (PROPORTIONAL mode)" },
         maxExposure: { type: "number", description: "Maximum total USDC exposure across all copied positions (optional)" },
         maxDailyLoss: { type: "number", description: "Maximum daily loss in USDC before copy trading is paused (optional)" },
@@ -1347,7 +1353,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Copy config UUID" },
-        mode: { type: "string", enum: ["FIXED", "PROPORTIONAL"], description: "Position sizing mode" },
+        mode: { type: "string", enum: ["PERCENTAGE", "FIXED", "MIRROR"], description: "Position sizing mode" },
         sizeValue: { type: "number", description: "Fixed size or proportional multiplier" },
         maxExposure: { type: "number", description: "Maximum total USDC exposure (optional)" },
         maxDailyLoss: { type: "number", description: "Maximum daily loss limit in USDC (optional)" },
@@ -1462,9 +1468,9 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Strategy UUID to comment on" },
-        body: { type: "string", description: "Comment text (max 1000 chars)" },
+        content: { type: "string", description: "Comment text (max 2000 chars)" },
       },
-      required: ["id", "body"],
+      required: ["id", "content"],
     },
   },
   {
@@ -1499,7 +1505,8 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Strategy UUID to report" },
-        reason: { type: "string", description: "Reason for the report (max 500 chars)" },
+        reason: { type: "string", enum: ["SPAM", "MISLEADING", "HARMFUL", "OTHER"], description: "Reason category for the report" },
+        description: { type: "string", description: "Additional details about the report (max 1000 chars, optional)" },
       },
       required: ["id", "reason"],
     },
@@ -1559,6 +1566,7 @@ const TOOLS = [
       properties: {
         name: { type: "string", description: "Descriptive label for the key (max 100 chars)" },
         expiresAt: { type: "string", description: "Expiry in ISO 8601 format (optional — no expiry if omitted)" },
+        scopes: { type: "array", items: { type: "string", enum: ["READ", "WRITE", "TRADE", "STRATEGY", "WEBHOOK"] }, description: "Permission scopes for this key (optional — defaults to READ only)" },
       },
       required: ["name"],
     },
@@ -1679,8 +1687,8 @@ const ROUTES: Record<string, RouteConfig> = {
   merge_position: { method: "POST", path: "/api/v1/orders/merge", body: (a) => mergePositionSchema.parse(a) },
   get_marketplace_listing: { method: "GET", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   // Discovery & Ranking (closes #66)
-  discover_strategies: { method: "GET", path: "/api/v1/discover", schema: discoverStrategiesSchema, query: (a) => pickDefined(a, ["sort", "category", "search", "limit", "offset"]) },
-  get_leaderboard: { method: "GET", path: "/api/v1/leaderboard", schema: leaderboardQuerySchema, query: (a) => pickDefined(a, ["period", "limit", "offset"]) },
+  discover_strategies: { method: "GET", path: "/api/v1/discover", schema: discoverStrategiesSchema, query: (a) => pickDefined(a, ["sort", "category", "search", "limit", "page"]) },
+  get_leaderboard: { method: "GET", path: "/api/v1/leaderboard", schema: leaderboardQuerySchema, query: (a) => pickDefined(a, ["period", "limit", "page"]) },
   // Paper Trading (closes #66)
   get_paper_summary: { method: "GET", path: "/api/v1/paper/summary" },
   reset_paper_account: { method: "POST", path: "/api/v1/paper/reset" },
@@ -1713,10 +1721,10 @@ const ROUTES: Record<string, RouteConfig> = {
   // Strategy social (#126)
   like_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/like`, schema: idSchema },
   list_strategy_comments: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, query: (a) => pickDefined(a, ["page", "limit"]) },
-  add_strategy_comment: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, schema: addStrategyCommentSchema, body: (a) => { const parsed = addStrategyCommentSchema.parse(a); return { body: parsed.body }; } },
+  add_strategy_comment: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, schema: addStrategyCommentSchema, body: (a) => { const parsed = addStrategyCommentSchema.parse(a); return { content: parsed.content }; } },
   delete_strategy_comment: { method: "DELETE", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments/${encodeURIComponent(String(a.commentId))}`, schema: deleteStrategyCommentSchema },
   list_strategy_children: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/children`, query: (a) => pickDefined(a, ["page", "limit"]) },
-  report_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/report`, schema: reportStrategySchema, body: (a) => { const parsed = reportStrategySchema.parse(a); return { reason: parsed.reason }; } },
+  report_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/report`, schema: reportStrategySchema, body: (a) => { const parsed = reportStrategySchema.parse(a); return { reason: parsed.reason, ...(parsed.description !== undefined && { description: parsed.description }) }; } },
   // Strategy versioning (#126)
   list_strategy_versions: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/versions`, schema: idSchema },
   rollback_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/versions/${encodeURIComponent(String(a.versionId))}/rollback`, schema: rollbackStrategySchema },
