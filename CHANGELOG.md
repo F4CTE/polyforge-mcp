@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.9.2] — 2026-04-17
+
+### Fixed
+- **#131** `list_strategies` status enum: added `ERROR` and `ARCHIVED` values to both the Zod schema and inputSchema — strategies in error/archived states were silently excluded from results
+- **#130** `get_whale_feed` and `get_news_signals`: added missing `marketId`, `page`, and `limit` query parameters to schemas, inputSchema definitions, and query forwarding functions
+- **#128** `update_marketplace_listing`: added missing `title` and `tags` parameters to Zod schema and inputSchema — title/tag updates were silently discarded
+- **#126** `discover_strategies` sort: constrained to `["popular","newest","returns","rating"]` enum instead of an unchecked string; `get_leaderboard` gains a `sortBy` parameter `["pnl","winRate","volume","tradeCount"]` to match the platform API
+- **#124** `create_marketplace_listing`: added required `type` field (`STRATEGY | SIGNAL | TEMPLATE`) to Zod schema and inputSchema
+- **#123** `create_copy_config` / `update_copy_config` mode enum: renamed `PERCENTAGE` → `EQUAL_WEIGHT` and `FIXED` → `FIXED_AMOUNT` to match the Polymarket platform's accepted values; also updated inputSchema descriptions
+- **#129** `report_strategy` reason enum: replaced `HARMFUL` with platform values `INAPPROPRIATE` and `FRAUDULENT`; schema now enforces the full platform enum
+
 ## [1.9.1] — 2026-04-17
 
 ### Security

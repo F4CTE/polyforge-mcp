@@ -260,7 +260,7 @@ const listMarketsQuerySchema = z.object({
 });
 
 const listStrategiesQuerySchema = z.object({
-  status: z.enum(["IDLE", "RUNNING", "PAUSED", "PAPER"]).optional(),
+  status: z.enum(["IDLE", "RUNNING", "PAUSED", "PAPER", "ERROR", "ARCHIVED"]).optional(),
   sort: z.enum(["createdAt", "updatedAt", "name", "status", "likeCount"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).optional(),
@@ -278,11 +278,15 @@ const getOrdersQuerySchema = z.object({
 
 const whaleFeedQuerySchema = z.object({
   minSize: z.coerce.number().min(0).optional(),
+  marketId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 const newsSignalsQuerySchema = z.object({
   minConfidence: z.coerce.number().min(0).max(1).optional(),
+  marketId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
@@ -319,7 +323,7 @@ const browseMarketplaceQuerySchema = z.object({
 // ─── New tool schemas (closes #66) ──────────────────────────────
 
 const discoverStrategiesSchema = z.object({
-  sort: z.string().max(50).optional(),
+  sort: z.enum(["popular", "newest", "returns", "rating"]).optional(),
   category: z.string().max(100).optional(),
   search: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -328,6 +332,7 @@ const discoverStrategiesSchema = z.object({
 
 const leaderboardQuerySchema = z.object({
   period: z.enum(["7d", "30d", "allTime"]).optional(),
+  sortBy: z.enum(["pnl", "winRate", "volume", "tradeCount"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).optional(),
 });
@@ -343,6 +348,7 @@ const whaleAddressSchema = z.object({
 
 const createMarketplaceListingSchema = z.object({
   strategyId: z.string().uuid(),
+  type: z.enum(["STRATEGY", "SIGNAL", "TEMPLATE"]),
   title: z.string().min(1).max(200),
   priceUsdc: z.number().positive(),
   description: z.string().max(1000).optional(),
@@ -351,8 +357,10 @@ const createMarketplaceListingSchema = z.object({
 
 const updateMarketplaceListingSchema = z.object({
   id: z.string().uuid(),
+  title: z.string().min(1).max(200).optional(),
   price: z.number().positive().optional(),
   description: z.string().max(1000).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
 });
 
 const rateMarketplaceListingSchema = z.object({
@@ -363,7 +371,7 @@ const rateMarketplaceListingSchema = z.object({
 
 const createCopyConfigSchema = z.object({
   targetWallet: z.string().min(1).max(100),
-  mode: z.enum(["PERCENTAGE", "FIXED", "MIRROR"]).optional(),
+  mode: z.enum(["EQUAL_WEIGHT", "FIXED_AMOUNT", "MIRROR"]).optional(),
   sizeValue: z.number().positive().optional(),
   maxExposure: z.number().positive().optional(),
   maxDailyLoss: z.number().positive().optional(),
@@ -372,7 +380,7 @@ const createCopyConfigSchema = z.object({
 
 const updateCopyConfigSchema = z.object({
   id: z.string().uuid(),
-  mode: z.enum(["PERCENTAGE", "FIXED", "MIRROR"]).optional(),
+  mode: z.enum(["EQUAL_WEIGHT", "FIXED_AMOUNT", "MIRROR"]).optional(),
   sizeValue: z.number().positive().optional(),
   maxExposure: z.number().positive().optional(),
   maxDailyLoss: z.number().positive().optional(),
@@ -417,7 +425,7 @@ const deleteStrategyCommentSchema = z.object({
 
 const reportStrategySchema = z.object({
   id: z.string().uuid(),
-  reason: z.enum(["SPAM", "MISLEADING", "HARMFUL", "OTHER"]),
+  reason: z.enum(["SPAM", "MISLEADING", "INAPPROPRIATE", "FRAUDULENT", "OTHER"]),
   description: z.string().max(1000).optional(),
 });
 
@@ -439,7 +447,7 @@ const updateRiskSettingsSchema = z.object({
 });
 
 const server = new Server(
-  { name: "polyforge", version: "1.9.0" },
+  { name: "polyforge", version: "1.9.2" },
   { capabilities: { tools: {} } },
 );
 
@@ -478,7 +486,7 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        status: { type: "string", enum: ["IDLE", "RUNNING", "PAUSED", "PAPER"], description: "Filter by strategy status" },
+        status: { type: "string", enum: ["IDLE", "RUNNING", "PAUSED", "PAPER", "ERROR", "ARCHIVED"], description: "Filter by strategy status" },
         sort: { type: "string", enum: ["createdAt", "updatedAt", "name", "status", "likeCount"], description: "Sort order (default: createdAt)" },
         limit: { type: "number", description: "Max results per page (default 20, max 100)" },
         page: { type: "number", description: "Page number (default 1)" },
@@ -633,6 +641,9 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         minSize: { type: "number", description: "Minimum trade size in USDC (default 10000)" },
+        marketId: { type: "string", description: "Filter whale trades by market UUID (optional)" },
+        page: { type: "number", description: "Page number for pagination (default 1)" },
+        limit: { type: "number", description: "Max results per page (default 20, max 100)" },
       },
     },
   },
@@ -642,7 +653,10 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        minConfidence: { type: "number", description: "Minimum confidence score 1-100 (default 70)" },
+        minConfidence: { type: "number", description: "Minimum confidence score 0–1 (default 0.7)" },
+        marketId: { type: "string", description: "Filter signals by market UUID (optional)" },
+        page: { type: "number", description: "Page number for pagination (default 1)" },
+        limit: { type: "number", description: "Max results per page (default 20, max 100)" },
       },
     },
   },
@@ -1165,7 +1179,7 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        sort: { type: "string", description: "Sort order (e.g. popular, newest, rating)" },
+        sort: { type: "string", enum: ["popular", "newest", "returns", "rating"], description: "Sort order (default: popular)" },
         category: { type: "string", description: "Category filter (e.g. crypto, politics, sports)" },
         search: { type: "string", description: "Search query to filter strategies by title or description" },
         limit: { type: "number", description: "Max results per page (default 20, max 100)" },
@@ -1180,6 +1194,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         period: { type: "string", enum: ["7d", "30d", "allTime"], description: "Time period (default: 30d)" },
+        sortBy: { type: "string", enum: ["pnl", "winRate", "volume", "tradeCount"], description: "Ranking metric (default: pnl)" },
         limit: { type: "number", description: "Max results (default 20, max 100)" },
         page: { type: "number", description: "Page number for pagination (default 1)" },
       },
@@ -1279,23 +1294,26 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         strategyId: { type: "string", description: "UUID of the strategy to list" },
+        type: { type: "string", enum: ["STRATEGY", "SIGNAL", "TEMPLATE"], description: "Listing type: STRATEGY (automated), SIGNAL (alerts only), or TEMPLATE (non-executable blueprint)" },
         title: { type: "string", description: "Listing title shown to buyers (max 200 chars)" },
         priceUsdc: { type: "number", description: "Listing price in USDC (must be positive)" },
         description: { type: "string", description: "Marketplace description shown to buyers (max 1000 chars, optional)" },
         tags: { type: "array", items: { type: "string" }, description: "Tags for discoverability (max 20, optional)" },
       },
-      required: ["strategyId", "title", "priceUsdc"],
+      required: ["strategyId", "type", "title", "priceUsdc"],
     },
   },
   {
     name: "update_marketplace_listing",
-    description: "Update the price or description of one of your marketplace listings.",
+    description: "Update the title, price, description, or tags of one of your marketplace listings.",
     inputSchema: {
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Marketplace listing UUID" },
+        title: { type: "string", description: "Updated listing title (max 200 chars, optional)" },
         price: { type: "number", description: "New listing price in USDC (optional)" },
         description: { type: "string", description: "Updated description (max 1000 chars, optional)" },
+        tags: { type: "array", items: { type: "string" }, description: "Updated tags for discoverability (max 20, optional)" },
       },
       required: ["id"],
     },
@@ -1331,8 +1349,8 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         targetWallet: { type: "string", description: "Wallet address to copy trades from" },
-        mode: { type: "string", enum: ["PERCENTAGE", "FIXED", "MIRROR"], description: "Position sizing mode: PERCENTAGE (percentage of portfolio), FIXED (fixed USDC per trade), or MIRROR (mirrors target's position size)" },
-        sizeValue: { type: "number", description: "Fixed USDC amount per trade (FIXED mode) or multiplier (PROPORTIONAL mode)" },
+        mode: { type: "string", enum: ["EQUAL_WEIGHT", "FIXED_AMOUNT", "MIRROR"], description: "Position sizing mode: EQUAL_WEIGHT (split capital equally), FIXED_AMOUNT (fixed USDC per trade), or MIRROR (mirrors target's position size)" },
+        sizeValue: { type: "number", description: "Fixed USDC amount per trade (FIXED_AMOUNT mode) or weight multiplier (EQUAL_WEIGHT mode)" },
         maxExposure: { type: "number", description: "Maximum total USDC exposure across all copied positions (optional)" },
         maxDailyLoss: { type: "number", description: "Maximum daily loss in USDC before copy trading is paused (optional)" },
         priceOffset: { type: "number", description: "Price slippage offset to apply when entering copied trades (optional)" },
@@ -1358,8 +1376,8 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Copy config UUID" },
-        mode: { type: "string", enum: ["PERCENTAGE", "FIXED", "MIRROR"], description: "Position sizing mode" },
-        sizeValue: { type: "number", description: "Fixed size or proportional multiplier" },
+        mode: { type: "string", enum: ["EQUAL_WEIGHT", "FIXED_AMOUNT", "MIRROR"], description: "Position sizing mode" },
+        sizeValue: { type: "number", description: "Fixed USDC amount (FIXED_AMOUNT) or weight multiplier (EQUAL_WEIGHT)" },
         maxExposure: { type: "number", description: "Maximum total USDC exposure (optional)" },
         maxDailyLoss: { type: "number", description: "Maximum daily loss limit in USDC (optional)" },
         priceOffset: { type: "number", description: "Price offset for copied entries (optional)" },
@@ -1510,7 +1528,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Strategy UUID to report" },
-        reason: { type: "string", enum: ["SPAM", "MISLEADING", "HARMFUL", "OTHER"], description: "Reason category for the report" },
+        reason: { type: "string", enum: ["SPAM", "MISLEADING", "INAPPROPRIATE", "FRAUDULENT", "OTHER"], description: "Reason category for the report" },
         description: { type: "string", description: "Additional details about the report (max 1000 chars, optional)" },
       },
       required: ["id", "reason"],
@@ -1644,8 +1662,8 @@ const ROUTES: Record<string, RouteConfig> = {
   get_portfolio: { method: "GET", path: "/api/v1/portfolio" },
   get_orders: { method: "GET", path: "/api/v1/orders", schema: getOrdersQuerySchema, query: (a) => pickDefined(a, ["limit", "page", "status", "strategyId", "marketId", "from", "to"]) },
   get_score: { method: "GET", path: "/api/v1/scores/me" },
-  get_whale_feed: { method: "GET", path: "/api/v1/whales/feed", schema: whaleFeedQuerySchema, query: (a) => pickDefined(a, ["minSize", "limit"]) },
-  get_news_signals: { method: "GET", path: "/api/v1/news/signals", schema: newsSignalsQuerySchema, query: (a) => pickDefined(a, ["minConfidence", "limit"]) },
+  get_whale_feed: { method: "GET", path: "/api/v1/whales/feed", schema: whaleFeedQuerySchema, query: (a) => pickDefined(a, ["minSize", "marketId", "page", "limit"]) },
+  get_news_signals: { method: "GET", path: "/api/v1/news/signals", schema: newsSignalsQuerySchema, query: (a) => pickDefined(a, ["minConfidence", "marketId", "page", "limit"]) },
   get_accuracy: { method: "GET", path: "/api/v1/accuracy/me" },
   get_portfolio_review: { method: "GET", path: "/api/v1/ai/portfolio-review" },
   get_market_sentiment: { method: "GET", path: (a) => `/api/v1/news/sentiment/${encodeURIComponent(String(a.marketId))}`, schema: marketIdParamSchema },
@@ -1693,7 +1711,7 @@ const ROUTES: Record<string, RouteConfig> = {
   get_marketplace_listing: { method: "GET", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   // Discovery & Ranking (closes #66)
   discover_strategies: { method: "GET", path: "/api/v1/discover", schema: discoverStrategiesSchema, query: (a) => pickDefined(a, ["sort", "category", "search", "limit", "page"]) },
-  get_leaderboard: { method: "GET", path: "/api/v1/leaderboard", schema: leaderboardQuerySchema, query: (a) => pickDefined(a, ["period", "limit", "page"]) },
+  get_leaderboard: { method: "GET", path: "/api/v1/leaderboard", schema: leaderboardQuerySchema, query: (a) => pickDefined(a, ["period", "sortBy", "limit", "page"]) },
   // Paper Trading (closes #66)
   get_paper_summary: { method: "GET", path: "/api/v1/paper/summary" },
   reset_paper_account: { method: "POST", path: "/api/v1/paper/reset" },
