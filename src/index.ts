@@ -162,8 +162,8 @@ const mergePositionSchema = z.object({
 });
 
 const provideLiquiditySchema = z.object({
-  marketId: z.string(),
-  tokenId: z.string(),
+  marketId: z.string().uuid(),  // #119 — enforce UUID
+  tokenId: z.string().uuid(),   // #119 — enforce UUID
   amountUsdc: z.number().positive(),
   targetSpread: z.number().min(0).max(1).optional(),
 });
@@ -379,10 +379,15 @@ const updateCopyConfigSchema = z.object({
   priceOffset: z.number().optional(),
 });
 
+// #121 — restrict batch paths to user-facing /api/v1/ endpoints only
+const BATCH_PATH_RE = /^\/api\/v1\/[a-zA-Z0-9\-._~!$&'()*+,;=:@]+(?:\/[a-zA-Z0-9\-._~!$&'()*+,;=:@]*)*\/?$/;
+
 const batchRequestItemSchema = z.object({
   id: z.string().min(1).max(100),
   method: z.enum(["GET", "POST", "PATCH", "DELETE"]),
-  path: z.string().min(1).max(500),
+  path: z.string().min(1).max(500)
+    .regex(BATCH_PATH_RE, "Path must be a user-facing /api/v1/ route")
+    .refine((p) => !p.includes(".."), { message: "Path must not contain traversal sequences" }),
   body: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -393,7 +398,7 @@ const batchRequestsSchema = z.object({
 // ─── POLA-104 compat fix schemas ──────────────────────────────────
 
 const getPriceHistorySchema = z.object({
-  marketId: z.string(),
+  marketId: z.string().uuid(),  // #120 — enforce UUID
   resolution: z.enum(["1m", "1h", "1d"]).optional(),
   from: z.string().max(50).optional(),
   to: z.string().max(50).optional(),
@@ -425,12 +430,6 @@ const createApiKeySchema = z.object({
   name: z.string().min(1).max(100),
   expiresAt: z.string().max(50).optional(),
   scopes: z.array(z.enum(["READ", "WRITE", "TRADE", "STRATEGY", "WEBHOOK"])).optional(),
-});
-
-const updateRiskSettingsSchema = z.object({
-  drawdownEnabled: z.boolean().optional(),
-  drawdownLookbackHours: z.number().int().min(1).max(168).optional(),
-  drawdownThresholdPct: z.number().min(0.01).max(0.99).optional(),
 });
 
 const updateRiskSettingsSchema = z.object({
@@ -1726,16 +1725,16 @@ const ROUTES: Record<string, RouteConfig> = {
   get_price_history: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.marketId))}/price-history`, schema: getPriceHistorySchema, query: (a) => pickDefined(a, ["resolution", "from", "to", "limit"]) },
   // Strategy social (#126)
   like_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/like`, schema: idSchema },
-  list_strategy_comments: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, query: (a) => pickDefined(a, ["page", "limit"]) },
+  list_strategy_comments: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, schema: idSchema, query: (a) => pickDefined(a, ["page", "limit"]) },  // #118
   add_strategy_comment: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, schema: addStrategyCommentSchema, body: (a) => { const parsed = addStrategyCommentSchema.parse(a); return { content: parsed.content }; } },
   delete_strategy_comment: { method: "DELETE", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments/${encodeURIComponent(String(a.commentId))}`, schema: deleteStrategyCommentSchema },
-  list_strategy_children: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/children`, query: (a) => pickDefined(a, ["page", "limit"]) },
+  list_strategy_children: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/children`, schema: idSchema, query: (a) => pickDefined(a, ["page", "limit"]) },  // #118
   report_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/report`, schema: reportStrategySchema, body: (a) => { const parsed = reportStrategySchema.parse(a); return { reason: parsed.reason, ...(parsed.description !== undefined && { description: parsed.description }) }; } },
   // Strategy versioning (#126)
   list_strategy_versions: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/versions`, schema: idSchema },
   rollback_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/versions/${encodeURIComponent(String(a.versionId))}/rollback`, schema: rollbackStrategySchema },
   // Strategy event log (#126)
-  get_strategy_event_log: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/event-log`, query: (a) => pickDefined(a, ["page", "limit"]) },
+  get_strategy_event_log: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/event-log`, schema: idSchema, query: (a) => pickDefined(a, ["page", "limit"]) },  // #118
   // API key management (#126)
   list_api_keys: { method: "GET", path: "/api/v1/api-keys" },
   create_api_key: { method: "POST", path: "/api/v1/api-keys", body: (a) => createApiKeySchema.parse(a) },
