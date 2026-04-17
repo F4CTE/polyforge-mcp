@@ -423,8 +423,14 @@ const createApiKeySchema = z.object({
   expiresAt: z.string().max(50).optional(),
 });
 
+const updateRiskSettingsSchema = z.object({
+  drawdownEnabled: z.boolean().optional(),
+  drawdownLookbackHours: z.number().int().min(1).max(168).optional(),
+  drawdownThresholdPct: z.number().min(0.01).max(0.99).optional(),
+});
+
 const server = new Server(
-  { name: "polyforge", version: "1.8.0" },
+  { name: "polyforge", version: "1.9.0" },
   { capabilities: { tools: {} } },
 );
 
@@ -1568,6 +1574,36 @@ const TOOLS = [
       required: ["id"],
     },
   },
+
+  // ── Risk Settings (closes #132) ──────────────────────────────────────
+  {
+    name: "get_risk_settings",
+    description: "Get the current risk / circuit-breaker settings for the authenticated user. Returns drawdown configuration and whether the circuit breaker is currently tripped.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "update_risk_settings",
+    description: "Update risk settings. Only the supplied fields are changed. Use this to enable the drawdown circuit breaker, set the lookback window (1–168 hours), or change the threshold percentage (0.01–0.99).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        drawdownEnabled: { type: "boolean", description: "Enable or disable the drawdown circuit breaker" },
+        drawdownLookbackHours: { type: "number", description: "Lookback window in hours (1–168, default 24)" },
+        drawdownThresholdPct: { type: "number", description: "Drawdown threshold as a decimal, e.g. 0.10 = 10% (0.01–0.99, default 0.10)" },
+      },
+    },
+  },
+  {
+    name: "reset_circuit_breaker",
+    description: "Reset the circuit breaker after it has been tripped, allowing the strategy engine to place new orders. Returns the updated risk settings with circuitBreakerTripped: false.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -1690,6 +1726,10 @@ const ROUTES: Record<string, RouteConfig> = {
   list_api_keys: { method: "GET", path: "/api/v1/api-keys" },
   create_api_key: { method: "POST", path: "/api/v1/api-keys", body: (a) => createApiKeySchema.parse(a) },
   revoke_api_key: { method: "DELETE", path: (a) => `/api/v1/api-keys/${encodeURIComponent(String(a.id))}`, schema: idSchema },
+// Risk Settings (closes #132)
+  get_risk_settings: { method: "GET", path: "/api/v1/settings/risk" },
+  update_risk_settings: { method: "PATCH", path: "/api/v1/settings/risk", schema: updateRiskSettingsSchema, body: (a) => updateRiskSettingsSchema.parse(a) },
+  reset_circuit_breaker: { method: "POST", path: "/api/v1/settings/risk/reset" },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
