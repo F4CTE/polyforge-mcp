@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.1] — 2026-04-17
+
+### Security
+- **Hono 4.12.14** — upgrade `hono` transitive dependency to ≥4.12.14 via pnpm override; fixes GHSA-458j-xx4x-4375 (HTML injection in JSX SSR via class names) (closes #117)
+- **UUID validation — `list_strategy_comments`, `list_strategy_children`, `get_strategy_event_log`** — strategy ID is now validated as UUID via `idSchema` before the path is constructed, preventing arbitrary string injection (closes #118)
+- **UUID validation — `provide_liquidity`** — `marketId` and `tokenId` tightened from `z.string()` to `z.string().uuid()`; restores protection lost in a previous compat fix (closes #119)
+- **UUID validation — `get_price_history`** — `marketId` tightened from `z.string()` to `z.string().uuid()` (closes #120)
+- **batch_requests path allowlist** — `path` field now must match `/api/v1/` prefix and disallows path traversal sequences, preventing MCP tool injection to internal/admin endpoints (closes #121)
+
+### Fixed
+- **Duplicate `updateRiskSettingsSchema` declaration** — removed accidental duplicate that caused a TypeScript compile error
+
 ## [1.8.0] — 2026-04-16
 
 ### Added
