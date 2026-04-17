@@ -433,6 +433,12 @@ const updateRiskSettingsSchema = z.object({
   drawdownThresholdPct: z.number().min(0.01).max(0.99).optional(),
 });
 
+const updateRiskSettingsSchema = z.object({
+  drawdownEnabled: z.boolean().optional(),
+  drawdownLookbackHours: z.number().int().min(1).max(168).optional(),
+  drawdownThresholdPct: z.number().min(0.01).max(0.99).optional(),
+});
+
 const server = new Server(
   { name: "polyforge", version: "1.9.0" },
   { capabilities: { tools: {} } },
