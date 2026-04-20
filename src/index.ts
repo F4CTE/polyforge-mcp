@@ -371,7 +371,7 @@ const rateMarketplaceListingSchema = z.object({
 
 const createCopyConfigSchema = z.object({
   targetWallet: z.string().min(1).max(100),
-  mode: z.enum(["EQUAL_WEIGHT", "FIXED_AMOUNT", "MIRROR"]).optional(),
+  mode: z.enum(["PERCENTAGE", "FIXED", "MIRROR"]).optional(),
   sizeValue: z.number().positive().optional(),
   maxExposure: z.number().positive().optional(),
   maxDailyLoss: z.number().positive().optional(),
@@ -380,7 +380,7 @@ const createCopyConfigSchema = z.object({
 
 const updateCopyConfigSchema = z.object({
   id: z.string().uuid(),
-  mode: z.enum(["EQUAL_WEIGHT", "FIXED_AMOUNT", "MIRROR"]).optional(),
+  mode: z.enum(["PERCENTAGE", "FIXED", "MIRROR"]).optional(),
   sizeValue: z.number().positive().optional(),
   maxExposure: z.number().positive().optional(),
   maxDailyLoss: z.number().positive().optional(),
@@ -1349,8 +1349,8 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         targetWallet: { type: "string", description: "Wallet address to copy trades from" },
-        mode: { type: "string", enum: ["EQUAL_WEIGHT", "FIXED_AMOUNT", "MIRROR"], description: "Position sizing mode: EQUAL_WEIGHT (split capital equally), FIXED_AMOUNT (fixed USDC per trade), or MIRROR (mirrors target's position size)" },
-        sizeValue: { type: "number", description: "Fixed USDC amount per trade (FIXED_AMOUNT mode) or weight multiplier (EQUAL_WEIGHT mode)" },
+        mode: { type: "string", enum: ["PERCENTAGE", "FIXED", "MIRROR"], description: "Position sizing mode: PERCENTAGE (copy X% of source trade size), FIXED (fixed USDC amount per trade), or MIRROR (mirrors target's position size)" },
+        sizeValue: { type: "number", description: "Percentage of source trade size (PERCENTAGE mode) or fixed USDC amount per trade (FIXED mode)" },
         maxExposure: { type: "number", description: "Maximum total USDC exposure across all copied positions (optional)" },
         maxDailyLoss: { type: "number", description: "Maximum daily loss in USDC before copy trading is paused (optional)" },
         priceOffset: { type: "number", description: "Price slippage offset to apply when entering copied trades (optional)" },
@@ -1376,8 +1376,8 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Copy config UUID" },
-        mode: { type: "string", enum: ["EQUAL_WEIGHT", "FIXED_AMOUNT", "MIRROR"], description: "Position sizing mode" },
-        sizeValue: { type: "number", description: "Fixed USDC amount (FIXED_AMOUNT) or weight multiplier (EQUAL_WEIGHT)" },
+        mode: { type: "string", enum: ["PERCENTAGE", "FIXED", "MIRROR"], description: "Position sizing mode" },
+        sizeValue: { type: "number", description: "Percentage of source trade size (PERCENTAGE) or fixed USDC amount (FIXED)" },
         maxExposure: { type: "number", description: "Maximum total USDC exposure (optional)" },
         maxDailyLoss: { type: "number", description: "Maximum daily loss limit in USDC (optional)" },
         priceOffset: { type: "number", description: "Price offset for copied entries (optional)" },
