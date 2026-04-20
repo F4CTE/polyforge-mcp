@@ -332,7 +332,6 @@ const discoverStrategiesSchema = z.object({
 
 const leaderboardQuerySchema = z.object({
   period: z.enum(["7d", "30d", "allTime"]).optional(),
-  sortBy: z.enum(["pnl", "winRate", "volume", "tradeCount"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).optional(),
 });
@@ -1190,12 +1189,11 @@ const TOOLS = [
   },
   {
     name: "get_leaderboard",
-    description: "Get the top trader leaderboard ranked by P&L, win rate, or volume for a given time period.",
+    description: "Get the top trader leaderboard ranked by P&L for a given time period.",
     inputSchema: {
       type: "object" as const,
       properties: {
         period: { type: "string", enum: ["7d", "30d", "allTime"], description: "Time period (default: 30d)" },
-        sortBy: { type: "string", enum: ["pnl", "winRate", "volume", "tradeCount"], description: "Ranking metric (default: pnl)" },
         limit: { type: "number", description: "Max results (default 20, max 100)" },
         page: { type: "number", description: "Page number for pagination (default 1)" },
       },
@@ -1713,7 +1711,7 @@ const ROUTES: Record<string, RouteConfig> = {
   get_marketplace_listing: { method: "GET", path: (a) => `/api/v1/marketplace/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   // Discovery & Ranking (closes #66)
   discover_strategies: { method: "GET", path: "/api/v1/discover", schema: discoverStrategiesSchema, query: (a) => pickDefined(a, ["sort", "category", "search", "limit", "page"]) },
-  get_leaderboard: { method: "GET", path: "/api/v1/leaderboard", schema: leaderboardQuerySchema, query: (a) => pickDefined(a, ["period", "sortBy", "limit", "page"]) },
+  get_leaderboard: { method: "GET", path: "/api/v1/leaderboard", schema: leaderboardQuerySchema, query: (a) => pickDefined(a, ["period", "limit", "page"]) },
   // Paper Trading (closes #66)
   get_paper_summary: { method: "GET", path: "/api/v1/paper/summary" },
   reset_paper_account: { method: "POST", path: "/api/v1/paper/reset" },
