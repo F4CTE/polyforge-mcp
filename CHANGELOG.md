@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.3] — 2026-04-20
+
+### Fixed
+- **#140** `report_strategy` reason enum: reverted incorrect #129 change; replaced `INAPPROPRIATE` and `FRAUDULENT` with platform-correct values `HARMFUL`; enum is now `["SPAM", "HARMFUL", "MISLEADING", "OTHER"]` matching the TypeScript SDK contract
+
 ## [1.9.2] — 2026-04-17
 
 ### Fixed

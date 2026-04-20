@@ -425,7 +425,7 @@ const deleteStrategyCommentSchema = z.object({
 
 const reportStrategySchema = z.object({
   id: z.string().uuid(),
-  reason: z.enum(["SPAM", "MISLEADING", "INAPPROPRIATE", "FRAUDULENT", "OTHER"]),
+  reason: z.enum(["SPAM", "HARMFUL", "MISLEADING", "OTHER"]),
   description: z.string().max(1000).optional(),
 });
 
@@ -1528,7 +1528,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Strategy UUID to report" },
-        reason: { type: "string", enum: ["SPAM", "MISLEADING", "INAPPROPRIATE", "FRAUDULENT", "OTHER"], description: "Reason category for the report" },
+        reason: { type: "string", enum: ["SPAM", "HARMFUL", "MISLEADING", "OTHER"], description: "Reason category for the report" },
         description: { type: "string", description: "Additional details about the report (max 1000 chars, optional)" },
       },
       required: ["id", "reason"],
