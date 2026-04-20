@@ -196,8 +196,10 @@ const importStrategySchema = z.object({
       actions: z.array(importBlockSchema).max(50).optional(),
     }).optional(),
     canvas: z.object({
-      positions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })).optional(),
-      connections: z.array(z.object({ from: z.string(), to: z.string() })).optional(),
+      positions: z.record(z.string().max(100), z.object({ x: z.number(), y: z.number() }))
+        .refine(obj => Object.keys(obj).length <= 200, { message: "Too many positions (max 200)" })
+        .optional(),
+      connections: z.array(z.object({ from: z.string().max(100), to: z.string().max(100) })).max(500).optional(),
     }).optional(),
   }),
 });
