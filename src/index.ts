@@ -81,7 +81,7 @@ const placeOrderSchema = z.object({
   outcome: z.enum(["YES", "NO"]),
   size: z.number().positive().min(1),
   price: z.number().min(0.001).max(0.999),
-  orderType: z.enum(["GTC", "GTD", "FOK"]).optional(),
+  orderType: z.enum(["GTC", "GTD", "FOK", "FAK", "POST_ONLY"]).optional(),
 });
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -775,7 +775,7 @@ const TOOLS = [
         outcome: { type: "string", enum: ["YES", "NO"], description: "Market outcome to trade" },
         size: { type: "number", description: "Number of shares (minimum 1)" },
         price: { type: "number", description: "Limit price per share (0.001-0.999). Use 0.999 for market buy, 0.001 for market sell." },
-        orderType: { type: "string", enum: ["GTC", "FOK", "GTD"], description: "Order type: GTC (good till cancel), FOK (fill or kill / market order), GTD (good till date). Default: GTC" },
+        orderType: { type: "string", enum: ["GTC", "FOK", "GTD", "FAK", "POST_ONLY"], description: "Order type: GTC (good till cancel), FOK (fill or kill), GTD (good till date), FAK (fill and kill, partial fills allowed), POST_ONLY (maker-only, rejected if would cross). Default: GTC" },
       },
       required: ["tokenId", "side", "outcome", "size", "price"],
     },
