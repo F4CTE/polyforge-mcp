@@ -57,7 +57,7 @@ const createStrategySchema = z.object({
   tags: z.array(z.string().max(50)).max(20).optional(),
   variables: z.array(strategyVariableSchema).max(20).optional(),
   canvas: z.record(z.string(), z.unknown()).optional(),
-  marketSlots: z.array(marketSlotSchema).optional(),
+  marketSlots: z.array(marketSlotSchema).max(20).optional(),
 });
 
 const createStrategyFromDescriptionSchema = z.object({
@@ -438,7 +438,7 @@ const rollbackStrategySchema = z.object({
 const createApiKeySchema = z.object({
   name: z.string().min(1).max(100),
   expiresAt: z.string().max(50).optional(),
-  scopes: z.array(z.enum(["READ", "WRITE", "TRADE", "STRATEGY", "WEBHOOK"])).optional(),
+  scopes: z.array(z.enum(["READ", "WRITE", "TRADE", "STRATEGY", "WEBHOOK"])).max(5).optional(),
 });
 
 const updateRiskSettingsSchema = z.object({
