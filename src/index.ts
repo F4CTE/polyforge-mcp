@@ -338,8 +338,9 @@ const leaderboardQuerySchema = z.object({
 });
 
 const topWhalesQuerySchema = z.object({
-  sort: z.enum(["volume", "pnl", "winRate", "tradeCount"]).optional(),
+  sortBy: z.enum(["volume", "pnl", "winRate", "tradeCount"]).optional(),
   period: z.string().max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 const whaleAddressSchema = z.object({
@@ -1243,8 +1244,9 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        sort: { type: "string", enum: ["volume", "pnl", "winRate", "tradeCount"], description: "Ranking metric (default: volume)" },
+        sortBy: { type: "string", enum: ["volume", "pnl", "winRate", "tradeCount"], description: "Ranking metric (default: volume)" },
         period: { type: "string", description: "Time period filter (e.g. 7d, 30d, allTime)" },
+        limit: { type: "number", description: "Number of results to return (1–100, default: 20)" },
       },
     },
   },
@@ -1718,7 +1720,7 @@ const ROUTES: Record<string, RouteConfig> = {
   // Batch API (closes #66)
   batch_requests: { method: "POST", path: "/api/v1/batch", body: (a) => ({ requests: batchRequestsSchema.parse(a).requests }) },
   // Extended Whale Intelligence (closes #66)
-  get_top_whales: { method: "GET", path: "/api/v1/whales/top", schema: topWhalesQuerySchema, query: (a) => pickDefined(a, ["sort", "period"]) },
+  get_top_whales: { method: "GET", path: "/api/v1/whales/top", schema: topWhalesQuerySchema, query: (a) => pickDefined(a, ["sortBy", "period", "limit"]) },
   get_whale_profile: { method: "GET", path: (a) => `/api/v1/whales/${encodeURIComponent(String(a.address))}`, schema: whaleAddressSchema },
   follow_whale: { method: "POST", path: (a) => `/api/v1/whales/${encodeURIComponent(String(a.address))}/follow`, schema: whaleAddressSchema },
   unfollow_whale: { method: "POST", path: (a) => `/api/v1/whales/${encodeURIComponent(String(a.address))}/unfollow`, schema: whaleAddressSchema },
