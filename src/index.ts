@@ -1647,7 +1647,7 @@ interface RouteConfig {
   body?: (args: Record<string, unknown>) => Record<string, unknown>;
 }
 
-const ROUTES: Record<string, RouteConfig> = {
+export const ROUTES: Record<string, RouteConfig> = {
   list_markets: { method: "GET", path: "/api/v1/markets", schema: listMarketsQuerySchema, query: (a) => pickDefined(a, ["search", "category", "sort", "closed", "limit", "page"]) },
   get_market: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.id))}`, schema: idSchema },
   list_strategies: { method: "GET", path: "/api/v1/strategies", schema: listStrategiesQuerySchema, query: (a) => pickDefined(a, ["status", "sort", "limit", "page"]) },
@@ -1716,7 +1716,7 @@ const ROUTES: Record<string, RouteConfig> = {
   get_paper_summary: { method: "GET", path: "/api/v1/paper/summary" },
   reset_paper_account: { method: "POST", path: "/api/v1/paper/reset" },
   // Batch API (closes #66)
-  batch_requests: { method: "POST", path: "/api/v1/batch", body: (a) => ({ requests: batchRequestsSchema.parse(a).requests }) },
+  batch_requests: { method: "POST", path: "/api/v1/batch", body: (a) => ({ items: batchRequestsSchema.parse(a).requests }) },
   // Extended Whale Intelligence (closes #66)
   get_top_whales: { method: "GET", path: "/api/v1/whales/top", schema: topWhalesQuerySchema, query: (a) => pickDefined(a, ["sortBy", "period", "limit"]) },
   get_whale_profile: { method: "GET", path: (a) => `/api/v1/whales/${encodeURIComponent(String(a.address))}`, schema: whaleAddressSchema },
