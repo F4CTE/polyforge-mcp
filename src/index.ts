@@ -350,11 +350,10 @@ const whaleAddressSchema = z.object({
 
 const createMarketplaceListingSchema = z.object({
   strategyId: z.string().uuid(),
-  type: z.enum(["STRATEGY", "SIGNAL", "TEMPLATE"]),
   title: z.string().min(1).max(200),
   priceUsdc: z.number().positive(),
   description: z.string().max(1000).optional(),
-  tags: z.array(z.string()).max(20).optional(),
+  tags: z.array(z.string().min(1).max(50)).max(20).optional(),
 });
 
 const updateMarketplaceListingSchema = z.object({
@@ -1296,13 +1295,12 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         strategyId: { type: "string", description: "UUID of the strategy to list" },
-        type: { type: "string", enum: ["STRATEGY", "SIGNAL", "TEMPLATE"], description: "Listing type: STRATEGY (automated), SIGNAL (alerts only), or TEMPLATE (non-executable blueprint)" },
         title: { type: "string", description: "Listing title shown to buyers (max 200 chars)" },
         priceUsdc: { type: "number", description: "Listing price in USDC (must be positive)" },
         description: { type: "string", description: "Marketplace description shown to buyers (max 1000 chars, optional)" },
         tags: { type: "array", items: { type: "string" }, description: "Tags for discoverability (max 20, optional)" },
       },
-      required: ["strategyId", "type", "title", "priceUsdc"],
+      required: ["strategyId", "title", "priceUsdc"],
     },
   },
   {
