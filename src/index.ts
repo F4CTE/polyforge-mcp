@@ -76,6 +76,7 @@ const aiQuerySchema = z.object({
 });
 
 const placeOrderSchema = z.object({
+  marketId: z.string().uuid(),
   tokenId: z.string().uuid(),
   side: z.enum(["BUY", "SELL"]),
   outcome: z.enum(["YES", "NO"]),
@@ -771,6 +772,7 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        marketId: { type: "string", description: "Market UUID (from GET /markets)" },
         tokenId: { type: "string", description: "Token ID to trade (get from market details)" },
         side: { type: "string", enum: ["BUY", "SELL"], description: "Order side" },
         outcome: { type: "string", enum: ["YES", "NO"], description: "Market outcome to trade" },
@@ -778,7 +780,7 @@ const TOOLS = [
         price: { type: "number", description: "Limit price per share (0.001-0.999). Use 0.999 for market buy, 0.001 for market sell." },
         orderType: { type: "string", enum: ["GTC", "FOK", "GTD"], description: "Order type: GTC (good till cancel), FOK (fill or kill / market order), GTD (good till date). Default: GTC" },
       },
-      required: ["tokenId", "side", "outcome", "size", "price"],
+      required: ["marketId", "tokenId", "side", "outcome", "size", "price"],
     },
   },
   {
