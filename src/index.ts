@@ -407,7 +407,7 @@ const batchRequestsSchema = z.object({
 // ─── POLA-104 compat fix schemas ──────────────────────────────────
 
 const getPriceHistorySchema = z.object({
-  marketId: z.string().uuid(),  // #120 — enforce UUID
+  tokenId: z.string().min(1),
   resolution: z.enum(["1m", "1h", "1d"]).optional(),
   from: z.string().max(50).optional(),
   to: z.string().max(50).optional(),
@@ -1449,13 +1449,13 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        marketId: { type: "string", description: "Market condition ID" },
+        tokenId: { type: "string", description: "Polymarket CLOB token ID (numeric string)" },
         resolution: { type: "string", enum: ["1m", "1h", "1d"], description: "Candle resolution (default: 1h)" },
         from: { type: "string", description: "Start date/time in ISO 8601 format (e.g. 2026-01-01T00:00:00Z)" },
         to: { type: "string", description: "End date/time in ISO 8601 format (e.g. 2026-01-31T23:59:59Z)" },
         limit: { type: "number", description: "Max data points to return (default: 100, max: 1000)" },
       },
-      required: ["marketId"],
+      required: ["tokenId"],
     },
   },
 
@@ -1740,7 +1740,7 @@ const ROUTES: Record<string, RouteConfig> = {
   // Backtest Orders (closes #66)
   get_backtest_orders: { method: "GET", path: (a) => `/api/v1/backtests/${encodeURIComponent(String(a.id))}/orders`, schema: idSchema },
   // Price history (#126)
-  get_price_history: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.marketId))}/price-history`, schema: getPriceHistorySchema, query: (a) => pickDefined(a, ["resolution", "from", "to", "limit"]) },
+  get_price_history: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.tokenId))}/price-history`, schema: getPriceHistorySchema, query: (a) => pickDefined(a, ["resolution", "from", "to", "limit"]) },
   // Strategy social (#126)
   like_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/like`, schema: idSchema },
   list_strategy_comments: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/comments`, schema: idSchema, query: (a) => pickDefined(a, ["page", "limit"]) },  // #118

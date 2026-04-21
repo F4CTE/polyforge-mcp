@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.4] — 2026-04-21
+
+### Fixed
+- **#151** `get_price_history`: renamed argument `marketId` → `tokenId` to match platform endpoint `/api/v1/markets/:tokenId/price-history`; relaxed validation from UUID-only to `z.string().min(1)` since Polymarket CLOB token IDs are large decimal strings, not UUIDs; updated MCP inputSchema description accordingly
+
 ## [1.9.3] — 2026-04-20
 
 ### Fixed
