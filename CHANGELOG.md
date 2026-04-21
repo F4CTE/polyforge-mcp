@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.4] — 2026-04-21
+
+### Fixed
+- **#141** `discover_strategies` sort enum: replaced `returns` → `top_pnl` and `rating` → `most_forked` to match the platform's `GET /api/v1/discover` endpoint and the TypeScript SDK `DiscoverParams` contract
+
 ## [1.9.3] — 2026-04-20
 
 ### Fixed
