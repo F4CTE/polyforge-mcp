@@ -325,7 +325,7 @@ const browseMarketplaceQuerySchema = z.object({
 // ─── New tool schemas (closes #66) ──────────────────────────────
 
 const discoverStrategiesSchema = z.object({
-  sort: z.enum(["popular", "newest", "returns", "rating"]).optional(),
+  sort: z.enum(["popular", "newest", "top_pnl", "most_forked"]).optional(),
   category: z.string().max(100).optional(),
   search: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -1180,7 +1180,7 @@ const TOOLS = [
     inputSchema: {
       type: "object" as const,
       properties: {
-        sort: { type: "string", enum: ["popular", "newest", "returns", "rating"], description: "Sort order (default: popular)" },
+        sort: { type: "string", enum: ["popular", "newest", "top_pnl", "most_forked"], description: "Sort order (default: popular)" },
         category: { type: "string", description: "Category filter (e.g. crypto, politics, sports)" },
         search: { type: "string", description: "Search query to filter strategies by title or description" },
         limit: { type: "number", description: "Max results per page (default 20, max 100)" },
