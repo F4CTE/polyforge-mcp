@@ -171,6 +171,7 @@ const provideLiquiditySchema = z.object({
 const startStrategySchema = z.object({
   id: z.string().uuid(),
   mode: z.enum(["live", "paper"]).default("paper"),
+  deploymentMode: z.enum(["LIVE", "SIMULATION"]).optional(),
 });
 
 const importBlockSchema = blockSchema.omit({ id: true });
@@ -640,6 +641,7 @@ const TOOLS = [
       properties: {
         id: { type: "string", description: "Strategy UUID" },
         mode: { type: "string", enum: ["live", "paper"], description: "Trading mode — paper is simulated, live places real orders (default: paper)" },
+        deploymentMode: { type: "string", enum: ["LIVE", "SIMULATION"], description: "Optional deployment mode override sent to the platform — SIMULATION for paper, LIVE for real orders" },
       },
       required: ["id"],
     },
@@ -1934,7 +1936,7 @@ export const ROUTES: Record<string, RouteConfig> = {
   create_strategy: { method: "POST", path: "/api/v1/strategies", body: (a) => createStrategySchema.parse(a) },
   update_strategy: { method: "PATCH", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}`, body: (a) => { const { id: _id, ...rest } = updateStrategySchema.parse(a); return rest; } },
   create_strategy_from_description: { method: "POST", path: "/api/v1/strategies/from-description", body: (a) => createStrategyFromDescriptionSchema.parse(a) },
-  start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, schema: startStrategySchema, body: (a) => { const parsed = startStrategySchema.parse(a); return { mode: parsed.mode }; } },
+  start_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/start`, schema: startStrategySchema, body: (a) => { const parsed = startStrategySchema.parse(a); return { paperMode: parsed.mode === "paper", ...(parsed.deploymentMode && { deploymentMode: parsed.deploymentMode }) }; } },
   stop_strategy: { method: "POST", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/stop`, schema: idSchema },
   get_strategy_templates: { method: "GET", path: "/api/v1/strategies/templates" },
   export_strategy: { method: "GET", path: (a) => `/api/v1/strategies/${encodeURIComponent(String(a.id))}/export`, schema: idSchema },
