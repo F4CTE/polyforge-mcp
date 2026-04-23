@@ -264,6 +264,7 @@ const getStrategyEventsSchema = z.object({
 // format at the MCP boundary instead of forwarding arbitrary strings.
 
 const idSchema = z.object({ id: z.string().uuid() });
+const conditionIdSchema = z.object({ conditionId: z.string().min(1) });
 
 const marketIdParamSchema = z.object({ marketId: z.string().uuid() });
 
@@ -1934,6 +1935,66 @@ const TOOLS = [
       },
     },
   },
+  // ── Rewards & Rebates (closes #155) ─────────────────────────────────
+  {
+    name: "list_rewards_markets",
+    description: "List all Polymarket markets that are eligible for liquidity rewards. Returns each market's condition ID, daily reward amount, and reward parameters.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_rewards_for_market",
+    description: "Get reward details for a specific market by its Polymarket condition ID. Returns the reward rate, daily payout, and eligibility criteria for that market.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        conditionId: { type: "string", description: "Polymarket condition ID of the market" },
+      },
+      required: ["conditionId"],
+    },
+  },
+  {
+    name: "get_user_rewards",
+    description: "Get the authenticated user's accrued Polymarket liquidity rewards. Returns an array of reward entries with amounts and market details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_user_rewards_total",
+    description: "Get the authenticated user's total accumulated rewards with a breakdown by date. Useful for tracking reward earnings over time.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_user_rewards_percentages",
+    description: "Get the authenticated user's reward allocation percentages. Shows the percentage breakdown of rewards across different markets or categories.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_user_rewards_per_market",
+    description: "Get the authenticated user's rewards broken down by individual market. Shows how much each market has contributed to total rewards.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_user_rebates",
+    description: "Get the authenticated user's Polymarket trading rebates. Returns rebate amounts earned from trading activity.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -2078,6 +2139,14 @@ export const ROUTES: Record<string, RouteConfig> = {
   get_polymarket_portfolio: { method: "GET", path: "/api/v1/portfolio/polymarket/portfolio", schema: polymarketPortfolioSchema, query: (a) => pickDefined(a, ["limit", "page"]) },
   get_polymarket_earnings: { method: "GET", path: "/api/v1/portfolio/polymarket/earnings" },
   get_polymarket_activity: { method: "GET", path: "/api/v1/portfolio/polymarket/activity", schema: polymarketActivitySchema, query: (a) => pickDefined(a, ["limit", "page"]) },
+  // Rewards & Rebates (closes #155)
+  list_rewards_markets: { method: "GET", path: "/api/v1/rewards/markets" },
+  get_rewards_for_market: { method: "GET", path: (a) => `/api/v1/rewards/markets/${encodeURIComponent(String(a.conditionId))}`, schema: conditionIdSchema },
+  get_user_rewards: { method: "GET", path: "/api/v1/rewards/user" },
+  get_user_rewards_total: { method: "GET", path: "/api/v1/rewards/user/total" },
+  get_user_rewards_percentages: { method: "GET", path: "/api/v1/rewards/user/percentages" },
+  get_user_rewards_per_market: { method: "GET", path: "/api/v1/rewards/user/markets" },
+  get_user_rebates: { method: "GET", path: "/api/v1/rewards/rebates" },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 

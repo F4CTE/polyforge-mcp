@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.10.0] — 2026-04-23
+
+### Added
+- **Rewards & Rebates** — `list_rewards_markets`, `get_rewards_for_market`, `get_user_rewards`, `get_user_rewards_total`, `get_user_rewards_percentages`, `get_user_rewards_per_market`, `get_user_rebates` (closes #155)
+
 ## [1.9.4] — 2026-04-21
 
 ### Fixed
