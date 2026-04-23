@@ -447,8 +447,70 @@ const updateRiskSettingsSchema = z.object({
   drawdownThresholdPct: z.number().min(0.01).max(0.99).optional(),
 });
 
+// ─── POLA-297 missing platform endpoint schemas ─────────────────────
+
+const searchMarketsSchema = z.object({
+  query: z.string().min(1).max(200),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+});
+
+const tokenIdParamSchema = z.object({
+  tokenId: z.string().min(1).max(200),
+});
+
+const clobPricesHistorySchema = z.object({
+  tokenId: z.string().min(1).max(200),
+  interval: z.enum(["1m", "5m", "15m", "1h", "4h", "1d"]).optional(),
+  fidelity: z.coerce.number().int().min(1).max(1440).optional(),
+  startTs: z.coerce.number().int().optional(),
+  endTs: z.coerce.number().int().optional(),
+});
+
+const placeBatchOrdersSchema = z.object({
+  orders: z.array(z.object({
+    tokenId: z.string().uuid(),
+    side: z.enum(["BUY", "SELL"]),
+    outcome: z.enum(["YES", "NO"]),
+    size: z.number().positive().min(1),
+    price: z.number().min(0.001).max(0.999),
+    orderType: z.enum(["GTC", "GTD", "FOK"]).optional(),
+  })).min(1).max(15),
+});
+
+const cancelOrdersBulkSchema = z.object({
+  orderIds: z.array(z.string().uuid()).min(1).max(3000),
+});
+
+const listNewsSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+});
+
+const newsArticleIdSchema = z.object({
+  id: z.string().min(1).max(100),
+});
+
+const topScoresSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const userIdParamSchema = z.object({
+  userId: z.string().min(1).max(200),
+});
+
+const polymarketPortfolioSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+});
+
+const polymarketActivitySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+});
+
 const server = new Server(
-  { name: "polyforge", version: "1.9.2" },
+  { name: "polyforge", version: "1.10.0" },
   { capabilities: { tools: {} } },
 );
 
@@ -1635,6 +1697,223 @@ const TOOLS = [
       properties: {},
     },
   },
+
+  // ── POLA-297: Missing platform endpoints ─────────────────────────────────
+
+  // Markets — extended data (6)
+  {
+    name: "search_markets",
+    description: "Search prediction markets by keyword. Returns matching markets with title, volume, and current prices.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search keyword or phrase (max 200 chars)" },
+        limit: { type: "number", description: "Max results per page (default 10, max 100)" },
+        page: { type: "number", description: "Page number (default 1)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_tick_size",
+    description: "Get the minimum tick size (price increment) for a market token on the CLOB.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Market token ID" },
+      },
+      required: ["tokenId"],
+    },
+  },
+  {
+    name: "get_spread",
+    description: "Get the current bid-ask spread for a market token on the CLOB.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Market token ID" },
+      },
+      required: ["tokenId"],
+    },
+  },
+  {
+    name: "get_midpoint",
+    description: "Get the current midpoint price for a market token on the CLOB.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Market token ID" },
+      },
+      required: ["tokenId"],
+    },
+  },
+  {
+    name: "get_clob_book",
+    description: "Get the full CLOB order book (bids and asks) for a market token.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Market token ID" },
+      },
+      required: ["tokenId"],
+    },
+  },
+  {
+    name: "get_clob_prices_history",
+    description: "Get historical CLOB prices for a market token with configurable interval and time range.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tokenId: { type: "string", description: "Market token ID" },
+        interval: { type: "string", enum: ["1m", "5m", "15m", "1h", "4h", "1d"], description: "Candle interval (default: 1h)" },
+        fidelity: { type: "number", description: "Number of data points to return (default: 100, max: 1440)" },
+        startTs: { type: "number", description: "Start timestamp (Unix seconds)" },
+        endTs: { type: "number", description: "End timestamp (Unix seconds)" },
+      },
+      required: ["tokenId"],
+    },
+  },
+
+  // Orders — bulk (2)
+  {
+    name: "place_batch_orders",
+    description: "Place multiple orders in a single batch (1–15 orders). More efficient than looping single orders.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        orders: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              tokenId: { type: "string", description: "Market token UUID" },
+              side: { type: "string", enum: ["BUY", "SELL"], description: "Order side" },
+              outcome: { type: "string", enum: ["YES", "NO"], description: "Token outcome" },
+              size: { type: "number", description: "Order size in contracts (min 1)" },
+              price: { type: "number", description: "Limit price (0.001–0.999)" },
+              orderType: { type: "string", enum: ["GTC", "GTD", "FOK"], description: "Time-in-force (default: GTC)" },
+            },
+            required: ["tokenId", "side", "outcome", "size", "price"],
+          },
+          description: "Array of 1–15 orders to place",
+        },
+      },
+      required: ["orders"],
+    },
+  },
+  {
+    name: "cancel_orders_bulk",
+    description: "Cancel multiple orders in bulk (1–3000 order IDs). More efficient than cancelling one at a time.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        orderIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of 1–3000 order UUIDs to cancel",
+        },
+      },
+      required: ["orderIds"],
+    },
+  },
+
+  // News — articles (2)
+  {
+    name: "list_news",
+    description: "List recent news articles relevant to prediction markets.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Max results per page (default 20, max 100)" },
+        page: { type: "number", description: "Page number (default 1)" },
+      },
+    },
+  },
+  {
+    name: "get_news_article",
+    description: "Get the full content of a specific news article by ID.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "News article ID" },
+      },
+      required: ["id"],
+    },
+  },
+
+  // Scores — badges (4)
+  {
+    name: "get_top_scores",
+    description: "Get the top user scores leaderboard.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Max results to return (default 10, max 100)" },
+      },
+    },
+  },
+  {
+    name: "get_my_badges",
+    description: "Get badges earned by the authenticated user.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_user_score",
+    description: "Get the score and trading stats for a specific user.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: { type: "string", description: "User ID or wallet address" },
+      },
+      required: ["userId"],
+    },
+  },
+  {
+    name: "get_user_badges",
+    description: "Get badges earned by a specific user.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: { type: "string", description: "User ID or wallet address" },
+      },
+      required: ["userId"],
+    },
+  },
+
+  // Portfolio — Polymarket-native (3)
+  {
+    name: "get_polymarket_portfolio",
+    description: "Get the Polymarket-native portfolio view — positions, balances, and exposure across all markets.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Max positions to return (default 20, max 100)" },
+        page: { type: "number", description: "Page number (default 1)" },
+      },
+    },
+  },
+  {
+    name: "get_polymarket_earnings",
+    description: "Get Polymarket-native earnings data — realized PnL, redeemed winnings, and fee rebates.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_polymarket_activity",
+    description: "Get Polymarket-native activity feed — recent trades, redemptions, and position changes.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Max activity entries to return (default 20, max 100)" },
+        page: { type: "number", description: "Page number (default 1)" },
+      },
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -1761,6 +2040,24 @@ export const ROUTES: Record<string, RouteConfig> = {
   get_risk_settings: { method: "GET", path: "/api/v1/settings/risk" },
   update_risk_settings: { method: "PATCH", path: "/api/v1/settings/risk", schema: updateRiskSettingsSchema, body: (a) => updateRiskSettingsSchema.parse(a) },
   reset_circuit_breaker: { method: "POST", path: "/api/v1/settings/risk/reset" },
+  // POLA-297: Missing platform endpoints
+  search_markets: { method: "GET", path: "/api/v1/markets/search", schema: searchMarketsSchema, query: (a) => pickDefined(a, ["query", "limit", "page"]) },
+  get_tick_size: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.tokenId))}/tick-size`, schema: tokenIdParamSchema },
+  get_spread: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.tokenId))}/spread`, schema: tokenIdParamSchema },
+  get_midpoint: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.tokenId))}/midpoint`, schema: tokenIdParamSchema },
+  get_clob_book: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.tokenId))}/clob-book`, schema: tokenIdParamSchema },
+  get_clob_prices_history: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.tokenId))}/clob-prices-history`, schema: clobPricesHistorySchema, query: (a) => pickDefined(a, ["interval", "fidelity", "startTs", "endTs"]) },
+  place_batch_orders: { method: "POST", path: "/api/v1/orders/batch", schema: placeBatchOrdersSchema, body: (a) => placeBatchOrdersSchema.parse(a) },
+  cancel_orders_bulk: { method: "DELETE", path: "/api/v1/orders/bulk", schema: cancelOrdersBulkSchema, body: (a) => cancelOrdersBulkSchema.parse(a) },
+  list_news: { method: "GET", path: "/api/v1/news", schema: listNewsSchema, query: (a) => pickDefined(a, ["limit", "page"]) },
+  get_news_article: { method: "GET", path: (a) => `/api/v1/news/${encodeURIComponent(String(a.id))}`, schema: newsArticleIdSchema },
+  get_top_scores: { method: "GET", path: "/api/v1/scores/top", schema: topScoresSchema, query: (a) => pickDefined(a, ["limit"]) },
+  get_my_badges: { method: "GET", path: "/api/v1/scores/me/badges" },
+  get_user_score: { method: "GET", path: (a) => `/api/v1/scores/${encodeURIComponent(String(a.userId))}`, schema: userIdParamSchema },
+  get_user_badges: { method: "GET", path: (a) => `/api/v1/scores/${encodeURIComponent(String(a.userId))}/badges`, schema: userIdParamSchema },
+  get_polymarket_portfolio: { method: "GET", path: "/api/v1/portfolio/polymarket/portfolio", schema: polymarketPortfolioSchema, query: (a) => pickDefined(a, ["limit", "page"]) },
+  get_polymarket_earnings: { method: "GET", path: "/api/v1/portfolio/polymarket/earnings" },
+  get_polymarket_activity: { method: "GET", path: "/api/v1/portfolio/polymarket/activity", schema: polymarketActivitySchema, query: (a) => pickDefined(a, ["limit", "page"]) },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
