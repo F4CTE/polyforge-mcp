@@ -371,7 +371,7 @@ const createMarketplaceListingSchema = z.object({
   title: z.string().min(1).max(200),
   priceUsdc: z.number().positive(),
   description: z.string().max(1000).optional(),
-  tags: z.array(z.string()).max(20).optional(),
+  tags: z.array(z.string().min(1).max(50)).max(20).optional(),
 });
 
 const updateMarketplaceListingSchema = z.object({
