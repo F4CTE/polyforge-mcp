@@ -23,10 +23,16 @@ const MAX_SSE_BUFFER_SIZE = 1_048_576; // 1 MB
 // ─── Input validation schemas (Zod) ──────────────────────────────
 // Validates all tool inputs before forwarding to the backend API.
 
+const boundedRecord = (maxKeys: number) =>
+  z.record(z.string().max(100), z.unknown()).refine(
+    (obj) => Object.keys(obj).length <= maxKeys,
+    { message: `Record must have at most ${maxKeys} keys` },
+  );
+
 const blockSchema = z.object({
   id: z.string().optional(),
   type: z.string().max(100),
-  config: z.record(z.string(), z.unknown()).optional(),
+  config: boundedRecord(20).optional(),
 });
 
 const strategyVariableSchema = z.object({
@@ -56,7 +62,17 @@ const createStrategySchema = z.object({
   calcBlocks: z.array(blockSchema).max(50).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   variables: z.array(strategyVariableSchema).max(20).optional(),
-  canvas: z.record(z.string(), z.unknown()).optional(),
+  canvas: z.object({
+    positions: z.record(z.string().max(100), z.object({ x: z.number(), y: z.number() })).refine(
+      (obj) => Object.keys(obj).length <= 200,
+      { message: "Canvas positions must have at most 200 entries" },
+    ).optional(),
+    connections: z.array(z.object({ from: z.string().max(100), to: z.string().max(100) })).max(500).optional(),
+    viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number().min(0.1).max(10) }).optional(),
+  }).catchall(z.unknown()).refine(
+    (obj) => Object.keys(obj).length <= 10,
+    { message: "Canvas must have at most 10 top-level keys" },
+  ).optional(),
   marketSlots: z.array(marketSlotSchema).max(20).optional(),
 });
 
@@ -398,7 +414,7 @@ const batchRequestItemSchema = z.object({
   path: z.string().min(1).max(500)
     .regex(BATCH_PATH_RE, "Path must be a user-facing /api/v1/ route")
     .refine((p) => !p.includes(".."), { message: "Path must not contain traversal sequences" }),
-  body: z.record(z.string(), z.unknown()).optional(),
+  body: boundedRecord(50).optional(),
 });
 
 const batchRequestsSchema = z.object({
