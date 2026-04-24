@@ -528,8 +528,42 @@ const polymarketActivitySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
 });
 
+// ─── POLA-790 Phase A: Cross-venue arbitrage + whale alert schemas ──
+
+const crossVenueQuerySchema = z.object({
+  minSpread: z.coerce.number().min(0).optional(),
+});
+
+const matchIdParamSchema = z.object({
+  matchId: z.string().min(1).max(200),
+});
+
+const listMatchesQuerySchema = z.object({
+  verified: z.enum(["true", "false"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+const createMatchSchema = z.object({
+  polymarketId: z.string().min(1).max(255),
+  kalshiId: z.string().min(1).max(255),
+});
+
+const smartMoneyLeaderboardSchema = z.object({
+  period: z.enum(["24h", "7d", "30d", "all"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const upsertWhaleAlertFilterSchema = z.object({
+  minSize: z.string().regex(/^\d+(\.\d+)?$/).optional(),
+  marketIds: z.array(z.string().max(255)).max(50).optional(),
+  walletAddresses: z.array(z.string().max(255)).max(100).optional(),
+  sides: z.array(z.enum(["BUY", "SELL"])).max(2).optional(),
+  active: z.boolean().optional(),
+});
+
 const server = new Server(
-  { name: "polyforge", version: "1.10.0" },
+  { name: "polyforge", version: "1.11.0" },
   { capabilities: { tools: {} } },
 );
 
@@ -1995,12 +2029,143 @@ const TOOLS = [
       properties: {},
     },
   },
+
+  // ── POLA-790 Phase A: Cross-venue arbitrage ──────────────────────────
+  {
+    name: "get_cross_venue_opportunities",
+    description: "Find cross-venue arbitrage opportunities between Polymarket and Kalshi. Returns matched markets where price discrepancies create potential arbitrage spreads.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        minSpread: { type: "number", description: "Minimum spread percentage to filter by (default: 3)" },
+      },
+    },
+  },
+  {
+    name: "get_cross_venue_comparison",
+    description: "Get a detailed price comparison between Polymarket and Kalshi for a specific matched market pair.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        matchId: { type: "string", description: "Cross-venue match ID" },
+      },
+      required: ["matchId"],
+    },
+  },
+  {
+    name: "list_arbitrage_matches",
+    description: "List all cross-venue market matches between Polymarket and Kalshi. Optionally filter by verification status.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        verified: { type: "string", enum: ["true", "false"], description: "Filter by verification status" },
+        limit: { type: "number", description: "Max results (default 50, max 100)" },
+        offset: { type: "number", description: "Offset for pagination (default 0)" },
+      },
+    },
+  },
+  {
+    name: "get_arbitrage_matches_by_market",
+    description: "Get all cross-venue matches associated with a specific Polymarket market.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        marketId: { type: "string", description: "Polymarket market ID" },
+      },
+      required: ["marketId"],
+    },
+  },
+  {
+    name: "create_arbitrage_match",
+    description: "Manually create a cross-venue match linking a Polymarket market to a Kalshi event.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        polymarketId: { type: "string", description: "Polymarket condition ID" },
+        kalshiId: { type: "string", description: "Kalshi event ticker or ID" },
+      },
+      required: ["polymarketId", "kalshiId"],
+    },
+  },
+  {
+    name: "verify_arbitrage_match",
+    description: "Mark a cross-venue match as verified, confirming the Polymarket and Kalshi markets are equivalent.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        matchId: { type: "string", description: "Cross-venue match ID to verify" },
+      },
+      required: ["matchId"],
+    },
+  },
+  {
+    name: "delete_arbitrage_match",
+    description: "Delete a cross-venue market match.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        matchId: { type: "string", description: "Cross-venue match ID to delete" },
+      },
+      required: ["matchId"],
+    },
+  },
+  {
+    name: "sync_arbitrage_matches",
+    description: "Trigger an automatic sync to discover and create new cross-venue market matches between Polymarket and Kalshi.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+
+  // ── POLA-790 Phase A: Whale alerts + smart money leaderboard ─────────
+  {
+    name: "get_smart_money_leaderboard",
+    description: "Get the smart money leaderboard — top traders ranked by profitability, win rate, or volume over a time period.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        period: { type: "string", enum: ["24h", "7d", "30d", "all"], description: "Time period for ranking (default: all)" },
+        limit: { type: "number", description: "Max results (default 20, max 100)" },
+      },
+    },
+  },
+  {
+    name: "get_whale_alert_filter",
+    description: "Get the authenticated user's whale alert filter configuration — minimum trade size, target markets, and wallet addresses to track.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "upsert_whale_alert_filter",
+    description: "Create or update the whale alert filter. Configure minimum trade size, specific markets, wallet addresses, and trade sides to receive alerts for.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        minSize: { type: "string", description: "Minimum trade size as a decimal string (e.g. '1000')" },
+        marketIds: { type: "array", items: { type: "string" }, description: "Market IDs to filter alerts (max 50)" },
+        walletAddresses: { type: "array", items: { type: "string" }, description: "Wallet addresses to track (max 100)" },
+        sides: { type: "array", items: { type: "string", enum: ["BUY", "SELL"] }, description: "Trade sides to filter (BUY, SELL, or both)" },
+        active: { type: "boolean", description: "Enable or disable the alert filter" },
+      },
+    },
+  },
+  {
+    name: "delete_whale_alert_filter",
+    description: "Delete the authenticated user's whale alert filter configuration.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
 
 interface RouteConfig {
-  method: "GET" | "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string | ((args: Record<string, unknown>) => string);
   schema?: z.ZodType<unknown>;
   query?: (args: Record<string, unknown>) => Record<string, string>;
@@ -2147,6 +2312,20 @@ export const ROUTES: Record<string, RouteConfig> = {
   get_user_rewards_percentages: { method: "GET", path: "/api/v1/rewards/user/percentages" },
   get_user_rewards_per_market: { method: "GET", path: "/api/v1/rewards/user/markets" },
   get_user_rebates: { method: "GET", path: "/api/v1/rewards/rebates" },
+  // POLA-790 Phase A: Cross-venue arbitrage
+  get_cross_venue_opportunities: { method: "GET", path: "/api/v1/arbitrage/cross-venue", schema: crossVenueQuerySchema, query: (a) => pickDefined(a, ["minSpread"]) },
+  get_cross_venue_comparison: { method: "GET", path: (a) => `/api/v1/arbitrage/cross-venue/${encodeURIComponent(String(a.matchId))}/comparison`, schema: matchIdParamSchema },
+  list_arbitrage_matches: { method: "GET", path: "/api/v1/arbitrage/matches", schema: listMatchesQuerySchema, query: (a) => pickDefined(a, ["verified", "limit", "offset"]) },
+  get_arbitrage_matches_by_market: { method: "GET", path: (a) => `/api/v1/arbitrage/matches/market/${encodeURIComponent(String(a.marketId))}`, schema: marketIdParamSchema },
+  create_arbitrage_match: { method: "POST", path: "/api/v1/arbitrage/matches", body: (a) => createMatchSchema.parse(a) },
+  verify_arbitrage_match: { method: "POST", path: (a) => `/api/v1/arbitrage/matches/${encodeURIComponent(String(a.matchId))}/verify`, schema: matchIdParamSchema },
+  delete_arbitrage_match: { method: "DELETE", path: (a) => `/api/v1/arbitrage/matches/${encodeURIComponent(String(a.matchId))}`, schema: matchIdParamSchema },
+  sync_arbitrage_matches: { method: "POST", path: "/api/v1/arbitrage/matches/sync" },
+  // POLA-790 Phase A: Whale alerts + smart money leaderboard
+  get_smart_money_leaderboard: { method: "GET", path: "/api/v1/whales/leaderboard", schema: smartMoneyLeaderboardSchema, query: (a) => pickDefined(a, ["period", "limit"]) },
+  get_whale_alert_filter: { method: "GET", path: "/api/v1/whales/alerts/filter" },
+  upsert_whale_alert_filter: { method: "PUT", path: "/api/v1/whales/alerts/filter", body: (a) => upsertWhaleAlertFilterSchema.parse(a) },
+  delete_whale_alert_filter: { method: "DELETE", path: "/api/v1/whales/alerts/filter" },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
 };
 
