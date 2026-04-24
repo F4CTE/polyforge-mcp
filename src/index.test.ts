@@ -178,6 +178,8 @@ describe("ROUTES", () => {
     const route = ROUTES.delete_whale_alert_filter;
     expect(route.method).toBe("DELETE");
     expect(route.path).toBe("/api/v1/whales/alerts/filter");
+  });
+
   // ── POLA-792: Profile management routes ─────────────────────────
 
   it("update_my_profile passes validated body fields", () => {
@@ -336,4 +338,5 @@ describe("ROUTES", () => {
     expect(ROUTES[name].method).toBeDefined();
     expect(ROUTES[name].path).toBeDefined();
   });
+
 });

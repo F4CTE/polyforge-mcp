@@ -560,6 +560,9 @@ const upsertWhaleAlertFilterSchema = z.object({
   walletAddresses: z.array(z.string().max(255)).max(100).optional(),
   sides: z.array(z.enum(["BUY", "SELL"])).max(2).optional(),
   active: z.boolean().optional(),
+});
+
+
 // ─── POLA-792 user management schemas ───────────────────────────────
 
 const updateMyProfileSchema = z.object({
@@ -2119,16 +2122,6 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         minSpread: { type: "number", description: "Minimum spread percentage to filter by (default: 3)" },
-  // ── Profile management (POLA-792) ─────────────────────────────────
-  {
-    name: "update_my_profile",
-    description: "Update the authenticated user's profile. Can change display name, bio, and avatar URL.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        displayName: { type: "string", description: "Display name (max 50 chars)" },
-        bio: { type: "string", description: "Bio text (max 500 chars)" },
-        avatarUrl: { type: "string", description: "Avatar image URL" },
       },
     },
   },
@@ -2152,58 +2145,6 @@ const TOOLS = [
         verified: { type: "string", enum: ["true", "false"], description: "Filter by verification status" },
         limit: { type: "number", description: "Max results (default 50, max 100)" },
         offset: { type: "number", description: "Offset for pagination (default 0)" },
-    name: "change_password",
-    description: "Change the authenticated user's password. Requires the current password for verification.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        currentPassword: { type: "string", description: "Current password" },
-        newPassword: { type: "string", description: "New password (8-128 chars)" },
-      },
-      required: ["currentPassword", "newPassword"],
-    },
-  },
-  {
-    name: "update_profile_notifications",
-    description: "Update the authenticated user's notification preferences via the profile endpoint. Pass key-value pairs where keys are notification channel names and values are booleans.",
-    inputSchema: {
-      type: "object" as const,
-      additionalProperties: { type: "boolean" },
-    },
-  },
-  {
-    name: "get_profile",
-    description: "Get a user's public profile by username. Returns display name, bio, follower/following counts, public strategy count, and whether the authenticated user follows them.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        username: { type: "string", description: "Username of the profile to view" },
-      },
-      required: ["username"],
-    },
-  },
-  {
-    name: "toggle_follow",
-    description: "Follow or unfollow a user by username. Returns the new following state and updated follower count.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        username: { type: "string", description: "Username of the user to follow/unfollow" },
-      },
-      required: ["username"],
-    },
-  },
-  // ── Settings (POLA-792) ───────────────────────────────────────────
-  {
-    name: "update_settings_profile",
-    description: "Update profile settings via the settings endpoint. Can change display name, bio, avatar URL, and Twitter handle.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        displayName: { type: "string", description: "Display name (max 100 chars)" },
-        bio: { type: "string", description: "Bio text (max 500 chars)" },
-        avatarUrl: { type: "string", description: "Avatar image URL (HTTPS only)" },
-        twitterHandle: { type: "string", description: "Twitter/X handle (max 50 chars)" },
       },
     },
   },
@@ -2276,8 +2217,6 @@ const TOOLS = [
   {
     name: "get_whale_alert_filter",
     description: "Get the authenticated user's whale alert filter configuration — minimum trade size, target markets, and wallet addresses to track.",
-    name: "get_settings_notifications",
-    description: "Get the authenticated user's notification settings. Returns channel toggles (email, Telegram, Discord) and event-type toggles (order filled, strategy error, etc.).",
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -2294,6 +2233,95 @@ const TOOLS = [
         walletAddresses: { type: "array", items: { type: "string" }, description: "Wallet addresses to track (max 100)" },
         sides: { type: "array", items: { type: "string", enum: ["BUY", "SELL"] }, description: "Trade sides to filter (BUY, SELL, or both)" },
         active: { type: "boolean", description: "Enable or disable the alert filter" },
+      },
+    },
+  },
+  {
+    name: "delete_whale_alert_filter",
+    description: "Delete the authenticated user's whale alert filter configuration.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  // ── Profile management (POLA-792) ─────────────────────────────────
+  {
+    name: "update_my_profile",
+    description: "Update the authenticated user's profile. Can change display name, bio, and avatar URL.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        displayName: { type: "string", description: "Display name (max 50 chars)" },
+        bio: { type: "string", description: "Bio text (max 500 chars)" },
+        avatarUrl: { type: "string", description: "Avatar image URL" },
+      },
+    },
+  },
+  {
+    name: "change_password",
+    description: "Change the authenticated user's password. Requires the current password for verification.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        currentPassword: { type: "string", description: "Current password" },
+        newPassword: { type: "string", description: "New password (8-128 chars)" },
+      },
+      required: ["currentPassword", "newPassword"],
+    },
+  },
+  {
+    name: "update_profile_notifications",
+    description: "Update the authenticated user's notification preferences via the profile endpoint. Pass key-value pairs where keys are notification channel names and values are booleans.",
+    inputSchema: {
+      type: "object" as const,
+      additionalProperties: { type: "boolean" },
+    },
+  },
+  {
+    name: "get_profile",
+    description: "Get a user's public profile by username. Returns display name, bio, follower/following counts, public strategy count, and whether the authenticated user follows them.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        username: { type: "string", description: "Username of the profile to view" },
+      },
+      required: ["username"],
+    },
+  },
+  {
+    name: "toggle_follow",
+    description: "Follow or unfollow a user by username. Returns the new following state and updated follower count.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        username: { type: "string", description: "Username of the user to follow/unfollow" },
+      },
+      required: ["username"],
+    },
+  },
+  // ── Settings (POLA-792) ───────────────────────────────────────────
+  {
+    name: "update_settings_profile",
+    description: "Update profile settings via the settings endpoint. Can change display name, bio, avatar URL, and Twitter handle.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        displayName: { type: "string", description: "Display name (max 100 chars)" },
+        bio: { type: "string", description: "Bio text (max 500 chars)" },
+        avatarUrl: { type: "string", description: "Avatar image URL (HTTPS only)" },
+        twitterHandle: { type: "string", description: "Twitter/X handle (max 50 chars)" },
+      },
+    },
+  },
+  {
+    name: "get_settings_notifications",
+    description: "Get the authenticated user's notification settings. Returns channel toggles (email, Telegram, Discord) and event-type toggles (order filled, strategy error, etc.).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
     name: "update_settings_notifications",
     description: "Update the authenticated user's notification settings. Toggle notification channels and event types individually.",
     inputSchema: {
@@ -2315,8 +2343,6 @@ const TOOLS = [
     },
   },
   {
-    name: "delete_whale_alert_filter",
-    description: "Delete the authenticated user's whale alert filter configuration.",
     name: "update_settings_password",
     description: "Update password via settings. Requires current password and a new password with at least one uppercase letter, one lowercase letter, and one digit.",
     inputSchema: {
@@ -2569,9 +2595,9 @@ export const ROUTES: Record<string, RouteConfig> = {
   create_api_key: { method: "POST", path: "/api/v1/api-keys", body: (a) => createApiKeySchema.parse(a) },
   revoke_api_key: { method: "DELETE", path: (a) => `/api/v1/api-keys/${encodeURIComponent(String(a.id))}`, schema: idSchema },
 // Risk Settings (closes #132)
-  get_risk_settings: { method: "GET", path: "/api/settings/risk" },
-  update_risk_settings: { method: "PATCH", path: "/api/settings/risk", schema: updateRiskSettingsSchema, body: (a) => updateRiskSettingsSchema.parse(a) },
-  reset_circuit_breaker: { method: "POST", path: "/api/settings/risk/reset" },
+  get_risk_settings: { method: "GET", path: "/api/v1/settings/risk" },
+  update_risk_settings: { method: "PATCH", path: "/api/v1/settings/risk", schema: updateRiskSettingsSchema, body: (a) => updateRiskSettingsSchema.parse(a) },
+  reset_circuit_breaker: { method: "POST", path: "/api/v1/settings/risk/reset" },
   // POLA-297: Missing platform endpoints
   search_markets: { method: "GET", path: "/api/v1/markets/search", schema: searchMarketsSchema, query: (a) => pickDefined(a, ["query", "limit", "page"]) },
   get_tick_size: { method: "GET", path: (a) => `/api/v1/markets/${encodeURIComponent(String(a.tokenId))}/tick-size`, schema: tokenIdParamSchema },
@@ -2613,7 +2639,6 @@ export const ROUTES: Record<string, RouteConfig> = {
   upsert_whale_alert_filter: { method: "PUT", path: "/api/v1/whales/alerts/filter", body: (a) => upsertWhaleAlertFilterSchema.parse(a) },
   delete_whale_alert_filter: { method: "DELETE", path: "/api/v1/whales/alerts/filter" },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
-
   // Profile management (POLA-792)
   update_my_profile: { method: "PATCH", path: "/api/profile/me", body: (a) => updateMyProfileSchema.parse(a) },
   change_password: { method: "POST", path: "/api/profile/password", body: (a) => changePasswordSchema.parse(a) },
