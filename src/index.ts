@@ -563,7 +563,7 @@ const upsertWhaleAlertFilterSchema = z.object({
 });
 
 const server = new Server(
-  { name: "polyforge", version: "1.11.0" },
+  { name: "polyforge", version: "1.12.0" },
   { capabilities: { tools: {} } },
 );
 
@@ -2160,6 +2160,45 @@ const TOOLS = [
       properties: {},
     },
   },
+
+  // POLA-791 Phase B: Orders export, Portfolio export, Backtests quick
+  {
+    name: "export_orders_csv",
+    description: "Export all your orders as a CSV file. Returns raw CSV text suitable for spreadsheet import.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "export_portfolio_csv",
+    description: "Export your portfolio positions as a CSV file. Returns raw CSV text suitable for spreadsheet import.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "run_backtest_quick",
+    description: "Run a quick backtest — faster iteration with reduced fidelity. Same parameters as run_backtest but returns results faster.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        strategyId: { type: "string", description: "Strategy UUID to backtest" },
+        dateRangeStart: { type: "string", description: "Start date (ISO 8601: YYYY-MM-DD)" },
+        dateRangeEnd: { type: "string", description: "End date (ISO 8601: YYYY-MM-DD)" },
+        strategyBlocks: {
+          type: "object",
+          description: "Optional override: strategy block definitions (triggers, conditions, actions, safety, logicBlocks, calcBlocks)",
+        },
+        marketBindings: {
+          type: "object",
+          description: "Optional override: map of slot names to market UUIDs",
+        },
+      },
+      required: ["strategyId"],
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -2171,6 +2210,11 @@ interface RouteConfig {
   query?: (args: Record<string, unknown>) => Record<string, string>;
   body?: (args: Record<string, unknown>) => Record<string, unknown>;
 }
+
+export const CSV_EXPORT_PATHS: Record<string, string> = {
+  export_orders_csv: "/api/v1/orders/export/csv",
+  export_portfolio_csv: "/api/v1/portfolio/export/csv",
+};
 
 export const ROUTES: Record<string, RouteConfig> = {
   list_markets: { method: "GET", path: "/api/v1/markets", schema: listMarketsQuerySchema, query: (a) => pickDefined(a, ["search", "category", "sort", "closed", "limit", "page"]) },
@@ -2326,7 +2370,10 @@ export const ROUTES: Record<string, RouteConfig> = {
   get_whale_alert_filter: { method: "GET", path: "/api/v1/whales/alerts/filter" },
   upsert_whale_alert_filter: { method: "PUT", path: "/api/v1/whales/alerts/filter", body: (a) => upsertWhaleAlertFilterSchema.parse(a) },
   delete_whale_alert_filter: { method: "DELETE", path: "/api/v1/whales/alerts/filter" },
+  // POLA-791 Phase B: Quick backtest (CSV exports handled separately)
+  run_backtest_quick: { method: "POST", path: "/api/v1/backtests/quick", schema: runBacktestSchema, body: (a) => runBacktestSchema.parse(a) },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
+  // export_orders_csv and export_portfolio_csv are handled separately (CSV response, not JSON)
 };
 
 function pickDefined(obj: Record<string, unknown>, keys: string[]): Record<string, string> {
@@ -2547,6 +2594,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       const result = await pollStrategyEvents(apiUrl, apiKey, String(id), Number(after_timestamp), cap);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `API error: ${message}` }], isError: true };
+    }
+  }
+
+  // ── CSV export tools: return raw text, not JSON ──────────────────────
+  const csvPaths = CSV_EXPORT_PATHS;
+  if (csvPaths[name]) {
+    await acquireRateLimitToken();
+    try {
+      const res = await fetch(new URL(csvPaths[name], apiUrl).toString(), {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) {
+        let errMsg: string;
+        try {
+          const body = await res.json() as { message?: unknown; error?: unknown };
+          const field = body.message ?? body.error;
+          errMsg = typeof field === "string" ? field.slice(0, 200) : `Request failed with status ${res.status}`;
+        } catch {
+          errMsg = `Request failed with status ${res.status}`;
+        }
+        return { content: [{ type: "text", text: `API error: ${errMsg}` }], isError: true };
+      }
+      const csv = await res.text();
+      return { content: [{ type: "text", text: csv }] };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `API error: ${message}` }], isError: true };
