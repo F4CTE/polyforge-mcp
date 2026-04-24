@@ -294,4 +294,164 @@ describe("ROUTES", () => {
   it("CSV_EXPORT_PATHS maps export_portfolio_csv", () => {
     expect(CSV_EXPORT_PATHS.export_portfolio_csv).toBe("/api/v1/portfolio/export/csv");
   });
+
+  // ── POLA-792: Profile management routes ─────────────────────────
+
+  it("update_my_profile passes validated body fields", () => {
+    const body = ROUTES.update_my_profile.body!;
+    const result = body({ displayName: "Test", bio: "Hello" });
+    expect(result).toEqual({ displayName: "Test", bio: "Hello" });
+  });
+
+  it("change_password passes currentPassword and newPassword", () => {
+    const body = ROUTES.change_password.body!;
+    const result = body({ currentPassword: "old123", newPassword: "newPass99" });
+    expect(result).toEqual({ currentPassword: "old123", newPassword: "newPass99" });
+  });
+
+  it("update_profile_notifications passes boolean record", () => {
+    const body = ROUTES.update_profile_notifications.body!;
+    const result = body({ email: true, sms: false });
+    expect(result).toEqual({ email: true, sms: false });
+  });
+
+  it("get_profile builds path with encoded username", () => {
+    const path = ROUTES.get_profile.path as (a: Record<string, unknown>) => string;
+    expect(path({ username: "john doe" })).toBe("/api/profile/john%20doe");
+  });
+
+  it("toggle_follow builds path with encoded username", () => {
+    const path = ROUTES.toggle_follow.path as (a: Record<string, unknown>) => string;
+    expect(path({ username: "alice" })).toBe("/api/profile/alice/follow");
+  });
+
+  // ── POLA-792: Settings routes ─────────────────────────────────────
+
+  it("update_settings_profile passes validated body", () => {
+    const body = ROUTES.update_settings_profile.body!;
+    const result = body({ displayName: "Dev", twitterHandle: "@dev" });
+    expect(result).toEqual({ displayName: "Dev", twitterHandle: "@dev" });
+  });
+
+  it("update_settings_notifications passes notification toggles", () => {
+    const body = ROUTES.update_settings_notifications.body!;
+    const result = body({ emailEnabled: true, onOrderFilled: false });
+    expect(result).toEqual({ emailEnabled: true, onOrderFilled: false });
+  });
+
+  it("update_settings_password rejects weak passwords", () => {
+    const body = ROUTES.update_settings_password.body!;
+    expect(() => body({ currentPassword: "oldpass1", newPassword: "nouppercase1" })).toThrow();
+  });
+
+  it("update_settings_password accepts valid passwords", () => {
+    const body = ROUTES.update_settings_password.body!;
+    const result = body({ currentPassword: "OldPass1!", newPassword: "NewPass1!" });
+    expect(result).toEqual({ currentPassword: "OldPass1!", newPassword: "NewPass1!" });
+  });
+
+  it("update_risk_settings passes validated risk config", () => {
+    const body = ROUTES.update_risk_settings.body!;
+    const result = body({ drawdownEnabled: true, drawdownThresholdPct: 0.10 });
+    expect(result).toEqual({ drawdownEnabled: true, drawdownThresholdPct: 0.10 });
+  });
+
+  it("get_settings_notifications has no body transformer", () => {
+    expect(ROUTES.get_settings_notifications.body).toBeUndefined();
+  });
+
+  it("get_beta_usage is a GET with no body", () => {
+    expect(ROUTES.get_beta_usage.method).toBe("GET");
+    expect(ROUTES.get_beta_usage.body).toBeUndefined();
+  });
+
+  it("get_gas_usage is a GET with no body", () => {
+    expect(ROUTES.get_gas_usage.method).toBe("GET");
+    expect(ROUTES.get_gas_usage.body).toBeUndefined();
+  });
+
+  it("reset_circuit_breaker is a POST", () => {
+    expect(ROUTES.reset_circuit_breaker.method).toBe("POST");
+  });
+
+  // ── POLA-792: Support ticket routes ───────────────────────────────
+
+  it("create_ticket passes validated ticket body", () => {
+    const body = ROUTES.create_ticket.body!;
+    const result = body({ subject: "Help", body: "Need assistance", category: "TECHNICAL" });
+    expect(result).toEqual({ subject: "Help", body: "Need assistance", category: "TECHNICAL" });
+  });
+
+  it("create_ticket rejects invalid category", () => {
+    const body = ROUTES.create_ticket.body!;
+    expect(() => body({ subject: "Help", body: "Text", category: "INVALID" })).toThrow();
+  });
+
+  it("list_tickets uses query params for pagination", () => {
+    const query = ROUTES.list_tickets.query!;
+    const result = query({ page: 2, limit: 10 });
+    expect(result).toEqual({ page: "2", limit: "10" });
+  });
+
+  it("get_ticket builds path with encoded UUID", () => {
+    const path = ROUTES.get_ticket.path as (a: Record<string, unknown>) => string;
+    const uuid = "550e8400-e29b-41d4-a716-446655440000";
+    expect(path({ id: uuid })).toBe(`/api/tickets/${uuid}`);
+  });
+
+  it("add_ticket_message strips id from body", () => {
+    const body = ROUTES.add_ticket_message.body!;
+    const uuid = "550e8400-e29b-41d4-a716-446655440000";
+    const result = body({ id: uuid, body: "Reply text" });
+    expect(result).toEqual({ body: "Reply text" });
+    expect(result).not.toHaveProperty("id");
+  });
+
+  // ── POLA-792: Notification & venue preference routes ──────────────
+
+  it("update_notification_preferences passes preferences array", () => {
+    const body = ROUTES.update_notification_preferences.body!;
+    const result = body({
+      preferences: [{ event: "order_filled", inApp: true, email: false }],
+      emailDigest: "DAILY",
+    });
+    expect(result).toEqual({
+      preferences: [{ event: "order_filled", inApp: true, email: false }],
+      emailDigest: "DAILY",
+    });
+  });
+
+  it("update_venue_preferences passes venue config", () => {
+    const body = ROUTES.update_venue_preferences.body!;
+    const result = body({ defaultVenue: "polymarket", enabledVenues: ["polymarket", "kalshi"], singlePlatformMode: false });
+    expect(result).toEqual({ defaultVenue: "polymarket", enabledVenues: ["polymarket", "kalshi"], singlePlatformMode: false });
+  });
+
+  it("get_venue_preferences is a GET with no body", () => {
+    expect(ROUTES.get_venue_preferences.method).toBe("GET");
+    expect(ROUTES.get_venue_preferences.body).toBeUndefined();
+  });
+
+  it("get_notification_preferences is a GET with no body", () => {
+    expect(ROUTES.get_notification_preferences.method).toBe("GET");
+    expect(ROUTES.get_notification_preferences.body).toBeUndefined();
+  });
+
+  // ── POLA-792: All new tools exist in ROUTES ───────────────────────
+
+  it.each([
+    "update_my_profile", "change_password", "update_profile_notifications",
+    "get_profile", "toggle_follow",
+    "update_settings_profile", "get_settings_notifications", "update_settings_notifications",
+    "update_settings_password", "get_beta_usage", "get_gas_usage",
+    "get_risk_settings", "update_risk_settings", "reset_circuit_breaker",
+    "create_ticket", "list_tickets", "get_ticket", "add_ticket_message",
+    "get_notification_preferences", "update_notification_preferences",
+    "get_venue_preferences", "update_venue_preferences",
+  ])("ROUTES has entry for %s", (name) => {
+    expect(ROUTES[name]).toBeDefined();
+    expect(ROUTES[name].method).toBeDefined();
+    expect(ROUTES[name].path).toBeDefined();
+  });
+
 });
