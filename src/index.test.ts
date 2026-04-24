@@ -22,10 +22,12 @@ describe("ROUTES", () => {
     query?: (a: Record<string, unknown>) => Record<string, string>;
     body?: (a: Record<string, unknown>) => Record<string, unknown>;
   }>;
+  let CSV_EXPORT_PATHS: Record<string, string>;
 
   beforeAll(async () => {
     const mod = await import("./index.js");
     ROUTES = mod.ROUTES;
+    CSV_EXPORT_PATHS = mod.CSV_EXPORT_PATHS;
   });
 
   it("batch_requests body sends 'items' key (not 'requests') to match platform API", () => {
@@ -178,5 +180,118 @@ describe("ROUTES", () => {
     const route = ROUTES.delete_whale_alert_filter;
     expect(route.method).toBe("DELETE");
     expect(route.path).toBe("/api/v1/whales/alerts/filter");
+  });
+
+  // ── POLA-791 Phase B: Orders, Portfolio, News, Backtests ────────────
+
+  const POLA_791_PHASE_B_ROUTE_TOOLS = [
+    "place_batch_orders",
+    "cancel_orders_bulk",
+    "list_news",
+    "get_news_article",
+    "get_polymarket_portfolio",
+    "get_polymarket_earnings",
+    "get_polymarket_activity",
+    "run_backtest_quick",
+  ] as const;
+
+  it.each(POLA_791_PHASE_B_ROUTE_TOOLS)(
+    "%s is registered in ROUTES",
+    (name) => {
+      expect(ROUTES[name]).toBeDefined();
+      expect(ROUTES[name].method).toBeTruthy();
+    },
+  );
+
+  it("run_backtest_quick is POST to /api/v1/backtests/quick", () => {
+    const route = ROUTES.run_backtest_quick;
+    expect(route.method).toBe("POST");
+    expect(route.path).toBe("/api/v1/backtests/quick");
+  });
+
+  it("run_backtest_quick validates and passes body with strategyId", () => {
+    const route = ROUTES.run_backtest_quick;
+    const body = route.body!({
+      strategyId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      dateRangeStart: "2025-01-01",
+      dateRangeEnd: "2025-06-01",
+    });
+    expect(body).toMatchObject({
+      strategyId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      dateRangeStart: "2025-01-01",
+      dateRangeEnd: "2025-06-01",
+    });
+  });
+
+  it("run_backtest_quick rejects non-UUID strategyId", () => {
+    const route = ROUTES.run_backtest_quick;
+    expect(() => route.body!({ strategyId: "not-a-uuid" })).toThrow();
+  });
+
+  it("run_backtest_quick rejects invalid date format", () => {
+    const route = ROUTES.run_backtest_quick;
+    expect(() => route.body!({
+      strategyId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      dateRangeStart: "January 1st",
+    })).toThrow();
+  });
+
+  it("place_batch_orders is POST to /api/v1/orders/batch", () => {
+    const route = ROUTES.place_batch_orders;
+    expect(route.method).toBe("POST");
+    expect(route.path).toBe("/api/v1/orders/batch");
+  });
+
+  it("cancel_orders_bulk is DELETE to /api/v1/orders/bulk", () => {
+    const route = ROUTES.cancel_orders_bulk;
+    expect(route.method).toBe("DELETE");
+    expect(route.path).toBe("/api/v1/orders/bulk");
+  });
+
+  it("list_news passes limit and page as query", () => {
+    const route = ROUTES.list_news;
+    expect(route.method).toBe("GET");
+    expect(route.path).toBe("/api/v1/news");
+    const q = route.query!({ limit: 50, page: 2 });
+    expect(q).toEqual({ limit: "50", page: "2" });
+  });
+
+  it("get_news_article builds path with article id", () => {
+    const route = ROUTES.get_news_article;
+    expect(route.method).toBe("GET");
+    const path = (route.path as (a: Record<string, unknown>) => string)({ id: "article-123" });
+    expect(path).toBe("/api/v1/news/article-123");
+  });
+
+  it("get_polymarket_portfolio passes limit and page as query", () => {
+    const route = ROUTES.get_polymarket_portfolio;
+    expect(route.method).toBe("GET");
+    expect(route.path).toBe("/api/v1/portfolio/polymarket/portfolio");
+    const q = route.query!({ limit: 20, page: 1 });
+    expect(q).toEqual({ limit: "20", page: "1" });
+  });
+
+  it("get_polymarket_earnings is GET with no query", () => {
+    const route = ROUTES.get_polymarket_earnings;
+    expect(route.method).toBe("GET");
+    expect(route.path).toBe("/api/v1/portfolio/polymarket/earnings");
+  });
+
+  it("get_polymarket_activity passes limit and page as query", () => {
+    const route = ROUTES.get_polymarket_activity;
+    expect(route.method).toBe("GET");
+    expect(route.path).toBe("/api/v1/portfolio/polymarket/activity");
+    const q = route.query!({ limit: 30, page: 3 });
+    expect(q).toEqual({ limit: "30", page: "3" });
+  });
+
+  // ── POLA-791: CSV export paths ─────────────────────────────────────
+
+  it("CSV_EXPORT_PATHS maps export_orders_csv", () => {
+    expect(CSV_EXPORT_PATHS.export_orders_csv).toBe("/api/v1/orders/export/csv");
+  });
+
+  it("CSV_EXPORT_PATHS maps export_portfolio_csv", () => {
+    expect(CSV_EXPORT_PATHS.export_portfolio_csv).toBe("/api/v1/portfolio/export/csv");
   });
 });
