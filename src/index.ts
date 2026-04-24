@@ -647,7 +647,7 @@ const updateVenuePreferencesSchema = z.object({
 });
 
 const server = new Server(
-  { name: "polyforge", version: "1.11.0" },
+  { name: "polyforge", version: "1.13.0" },
   { capabilities: { tools: {} } },
 );
 
