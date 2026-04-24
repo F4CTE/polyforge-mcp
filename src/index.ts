@@ -562,8 +562,92 @@ const upsertWhaleAlertFilterSchema = z.object({
   active: z.boolean().optional(),
 });
 
+
+// ─── POLA-792 user management schemas ───────────────────────────────
+
+const updateMyProfileSchema = z.object({
+  displayName: z.string().max(50).optional(),
+  bio: z.string().max(500).optional(),
+  avatarUrl: z.string().url().max(2048).optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(128),
+});
+
+const updateProfileNotificationsSchema = z.object({}).catchall(z.boolean());
+
+const usernameParamSchema = z.object({
+  username: z.string().min(1).max(100),
+});
+
+const updateSettingsProfileSchema = z.object({
+  displayName: z.string().max(100).optional(),
+  bio: z.string().max(500).optional(),
+  avatarUrl: z.string().url().max(2048).optional(),
+  twitterHandle: z.string().max(50).optional(),
+});
+
+const updateSettingsNotificationsSchema = z.object({
+  emailEnabled: z.boolean().optional(),
+  telegramEnabled: z.boolean().optional(),
+  discordEnabled: z.boolean().optional(),
+  onOrderFilled: z.boolean().optional(),
+  onStrategyError: z.boolean().optional(),
+  onBacktestComplete: z.boolean().optional(),
+  onDailyLossLimit: z.boolean().optional(),
+  onMarketResolved: z.boolean().optional(),
+  onSomeoneForked: z.boolean().optional(),
+  onSomeoneFollowed: z.boolean().optional(),
+  onSomeoneLiked: z.boolean().optional(),
+  onSomeoneCommented: z.boolean().optional(),
+});
+
+const updateSettingsPasswordSchema = z.object({
+  currentPassword: z.string().min(8).max(100),
+  newPassword: z.string().min(8).max(100).regex(/(?=.*[A-Z])(?=.*[a-z])(?=.*\d)/),
+});
+
+const createTicketSchema = z.object({
+  subject: z.string().min(1).max(255),
+  category: z.enum(["GENERAL", "BILLING", "TECHNICAL", "ACCOUNT", "BUG", "FEATURE_REQUEST"]).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+  body: z.string().min(1).max(5000),
+});
+
+const listTicketsSchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const ticketIdSchema = z.object({
+  id: z.string().uuid(),
+});
+
+const addTicketMessageSchema = z.object({
+  id: z.string().uuid(),
+  body: z.string().min(1).max(5000),
+});
+
+const updateEventNotificationsSchema = z.object({
+  preferences: z.array(z.object({
+    event: z.string().min(1).max(100),
+    inApp: z.boolean().optional(),
+    email: z.boolean().optional(),
+    push: z.boolean().optional(),
+  })).max(50).optional(),
+  emailDigest: z.string().max(20).optional(),
+});
+
+const updateVenuePreferencesSchema = z.object({
+  defaultVenue: z.string().max(50).optional(),
+  enabledVenues: z.array(z.string().max(50)).min(1).max(20).optional(),
+  singlePlatformMode: z.boolean().optional(),
+});
+
 const server = new Server(
-  { name: "polyforge", version: "1.12.0" },
+  { name: "polyforge", version: "1.13.0" },
   { capabilities: { tools: {} } },
 );
 
@@ -2199,6 +2283,234 @@ const TOOLS = [
       required: ["strategyId"],
     },
   },
+  // ── Profile management (POLA-792) ─────────────────────────────────
+  {
+    name: "update_my_profile",
+    description: "Update the authenticated user's profile. Can change display name, bio, and avatar URL.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        displayName: { type: "string", description: "Display name (max 50 chars)" },
+        bio: { type: "string", description: "Bio text (max 500 chars)" },
+        avatarUrl: { type: "string", description: "Avatar image URL" },
+      },
+    },
+  },
+  {
+    name: "change_password",
+    description: "Change the authenticated user's password. Requires the current password for verification.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        currentPassword: { type: "string", description: "Current password" },
+        newPassword: { type: "string", description: "New password (8-128 chars)" },
+      },
+      required: ["currentPassword", "newPassword"],
+    },
+  },
+  {
+    name: "update_profile_notifications",
+    description: "Update the authenticated user's notification preferences via the profile endpoint. Pass key-value pairs where keys are notification channel names and values are booleans.",
+    inputSchema: {
+      type: "object" as const,
+      additionalProperties: { type: "boolean" },
+    },
+  },
+  {
+    name: "get_profile",
+    description: "Get a user's public profile by username. Returns display name, bio, follower/following counts, public strategy count, and whether the authenticated user follows them.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        username: { type: "string", description: "Username of the profile to view" },
+      },
+      required: ["username"],
+    },
+  },
+  {
+    name: "toggle_follow",
+    description: "Follow or unfollow a user by username. Returns the new following state and updated follower count.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        username: { type: "string", description: "Username of the user to follow/unfollow" },
+      },
+      required: ["username"],
+    },
+  },
+  // ── Settings (POLA-792) ───────────────────────────────────────────
+  {
+    name: "update_settings_profile",
+    description: "Update profile settings via the settings endpoint. Can change display name, bio, avatar URL, and Twitter handle.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        displayName: { type: "string", description: "Display name (max 100 chars)" },
+        bio: { type: "string", description: "Bio text (max 500 chars)" },
+        avatarUrl: { type: "string", description: "Avatar image URL (HTTPS only)" },
+        twitterHandle: { type: "string", description: "Twitter/X handle (max 50 chars)" },
+      },
+    },
+  },
+  {
+    name: "get_settings_notifications",
+    description: "Get the authenticated user's notification settings. Returns channel toggles (email, Telegram, Discord) and event-type toggles (order filled, strategy error, etc.).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "update_settings_notifications",
+    description: "Update the authenticated user's notification settings. Toggle notification channels and event types individually.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        emailEnabled: { type: "boolean", description: "Enable email notifications" },
+        telegramEnabled: { type: "boolean", description: "Enable Telegram notifications" },
+        discordEnabled: { type: "boolean", description: "Enable Discord notifications" },
+        onOrderFilled: { type: "boolean", description: "Notify when an order is filled" },
+        onStrategyError: { type: "boolean", description: "Notify on strategy errors" },
+        onBacktestComplete: { type: "boolean", description: "Notify when a backtest completes" },
+        onDailyLossLimit: { type: "boolean", description: "Notify on daily loss limit hit" },
+        onMarketResolved: { type: "boolean", description: "Notify when a market resolves" },
+        onSomeoneForked: { type: "boolean", description: "Notify when someone forks your strategy" },
+        onSomeoneFollowed: { type: "boolean", description: "Notify when someone follows you" },
+        onSomeoneLiked: { type: "boolean", description: "Notify when someone likes your strategy" },
+        onSomeoneCommented: { type: "boolean", description: "Notify when someone comments" },
+      },
+    },
+  },
+  {
+    name: "update_settings_password",
+    description: "Update password via settings. Requires current password and a new password with at least one uppercase letter, one lowercase letter, and one digit.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        currentPassword: { type: "string", description: "Current password (8-100 chars)" },
+        newPassword: { type: "string", description: "New password (8-100 chars, must contain uppercase, lowercase, and digit)" },
+      },
+      required: ["currentPassword", "newPassword"],
+    },
+  },
+  {
+    name: "get_beta_usage",
+    description: "Get the authenticated user's beta usage limits and current consumption. Shows strategy count, monthly volume, position size cap, backtest concurrency, and marketplace listing limits.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_gas_usage",
+    description: "Get the authenticated user's daily gas usage. Returns today's usage, daily limit, and remaining gas allowance.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  // ── Support tickets (POLA-792) ────────────────────────────────────
+  {
+    name: "create_ticket",
+    description: "Create a new support ticket. Provide a subject, message body, and optionally a category and priority level.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        subject: { type: "string", description: "Ticket subject (1-255 chars)" },
+        category: { type: "string", enum: ["GENERAL", "BILLING", "TECHNICAL", "ACCOUNT", "BUG", "FEATURE_REQUEST"], description: "Ticket category (default: GENERAL)" },
+        priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "URGENT"], description: "Ticket priority (default: MEDIUM)" },
+        body: { type: "string", description: "Ticket message body (1-5000 chars)" },
+      },
+      required: ["subject", "body"],
+    },
+  },
+  {
+    name: "list_tickets",
+    description: "List the authenticated user's support tickets with pagination. Returns ticket details and message history.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        page: { type: "number", description: "Page number (default 1)" },
+        limit: { type: "number", description: "Results per page (default 20, max 100)" },
+      },
+    },
+  },
+  {
+    name: "get_ticket",
+    description: "Get a specific support ticket by ID. Returns ticket details and full message thread.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Ticket UUID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "add_ticket_message",
+    description: "Add a message to an existing support ticket. Use to reply or provide additional information.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Ticket UUID" },
+        body: { type: "string", description: "Message body (1-5000 chars)" },
+      },
+      required: ["id", "body"],
+    },
+  },
+  // ── Notification & venue preferences (POLA-792) ───────────────────
+  {
+    name: "get_notification_preferences",
+    description: "Get the authenticated user's per-event notification preferences and email digest setting.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "update_notification_preferences",
+    description: "Update per-event notification preferences. Set in-app, email, and push toggles for each event type, and configure email digest frequency.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        preferences: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              event: { type: "string", description: "Event type identifier" },
+              inApp: { type: "boolean", description: "Enable in-app notification" },
+              email: { type: "boolean", description: "Enable email notification" },
+              push: { type: "boolean", description: "Enable push notification" },
+            },
+            required: ["event"],
+          },
+          description: "Array of per-event notification settings",
+        },
+        emailDigest: { type: "string", description: "Email digest frequency (e.g. DAILY, WEEKLY)" },
+      },
+    },
+  },
+  {
+    name: "get_venue_preferences",
+    description: "Get the authenticated user's venue (exchange) preferences. Returns default venue, enabled venues list, and single-platform mode setting.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "update_venue_preferences",
+    description: "Update venue (exchange) preferences. Set default trading venue, enable/disable venues, and toggle single-platform mode.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        defaultVenue: { type: "string", description: "Default trading venue identifier" },
+        enabledVenues: { type: "array", items: { type: "string" }, description: "List of enabled venue identifiers (min 1)" },
+        singlePlatformMode: { type: "boolean", description: "Restrict to single venue at a time" },
+      },
+    },
+  },
 ];
 
 // ─── Route mapping ─────────────────────────────────────────────────
@@ -2374,6 +2686,32 @@ export const ROUTES: Record<string, RouteConfig> = {
   run_backtest_quick: { method: "POST", path: "/api/v1/backtests/quick", schema: runBacktestSchema, body: (a) => runBacktestSchema.parse(a) },
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
   // export_orders_csv and export_portfolio_csv are handled separately (CSV response, not JSON)
+  // Profile management (POLA-792)
+  update_my_profile: { method: "PATCH", path: "/api/profile/me", body: (a) => updateMyProfileSchema.parse(a) },
+  change_password: { method: "POST", path: "/api/profile/password", body: (a) => changePasswordSchema.parse(a) },
+  update_profile_notifications: { method: "PATCH", path: "/api/profile/notifications", body: (a) => updateProfileNotificationsSchema.parse(a) },
+  get_profile: { method: "GET", path: (a) => `/api/profile/${encodeURIComponent(String(a.username))}`, schema: usernameParamSchema },
+  toggle_follow: { method: "POST", path: (a) => `/api/profile/${encodeURIComponent(String(a.username))}/follow`, schema: usernameParamSchema },
+
+  // Settings (POLA-792)
+  update_settings_profile: { method: "PATCH", path: "/api/settings/profile", body: (a) => updateSettingsProfileSchema.parse(a) },
+  get_settings_notifications: { method: "GET", path: "/api/settings/notifications" },
+  update_settings_notifications: { method: "PATCH", path: "/api/settings/notifications", body: (a) => updateSettingsNotificationsSchema.parse(a) },
+  update_settings_password: { method: "PATCH", path: "/api/settings/password", body: (a) => updateSettingsPasswordSchema.parse(a) },
+  get_beta_usage: { method: "GET", path: "/api/settings/beta-usage" },
+  get_gas_usage: { method: "GET", path: "/api/settings/gas" },
+
+  // Support tickets (POLA-792)
+  create_ticket: { method: "POST", path: "/api/tickets", body: (a) => createTicketSchema.parse(a) },
+  list_tickets: { method: "GET", path: "/api/tickets", schema: listTicketsSchema, query: (a) => pickDefined(a, ["page", "limit"]) },
+  get_ticket: { method: "GET", path: (a) => `/api/tickets/${encodeURIComponent(String(a.id))}`, schema: ticketIdSchema },
+  add_ticket_message: { method: "POST", path: (a) => `/api/tickets/${encodeURIComponent(String(a.id))}/messages`, body: (a) => { const { id: _id, ...rest } = addTicketMessageSchema.parse(a); return rest; } },
+
+  // Notification & venue preferences (POLA-792)
+  get_notification_preferences: { method: "GET", path: "/api/users/me/notification-preferences" },
+  update_notification_preferences: { method: "PUT", path: "/api/users/me/notification-preferences", body: (a) => updateEventNotificationsSchema.parse(a) },
+  get_venue_preferences: { method: "GET", path: "/api/users/me/venue-preferences" },
+  update_venue_preferences: { method: "PATCH", path: "/api/users/me/venue-preferences", body: (a) => updateVenuePreferencesSchema.parse(a) },
 };
 
 function pickDefined(obj: Record<string, unknown>, keys: string[]): Record<string, string> {
