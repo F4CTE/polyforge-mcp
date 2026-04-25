@@ -2687,31 +2687,31 @@ export const ROUTES: Record<string, RouteConfig> = {
   // get_strategy_events is handled separately (SSE polling, not a simple REST call)
   // export_orders_csv and export_portfolio_csv are handled separately (CSV response, not JSON)
   // Profile management (POLA-792)
-  update_my_profile: { method: "PATCH", path: "/api/profile/me", body: (a) => updateMyProfileSchema.parse(a) },
-  change_password: { method: "POST", path: "/api/profile/password", body: (a) => changePasswordSchema.parse(a) },
-  update_profile_notifications: { method: "PATCH", path: "/api/profile/notifications", body: (a) => updateProfileNotificationsSchema.parse(a) },
-  get_profile: { method: "GET", path: (a) => `/api/profile/${encodeURIComponent(String(a.username))}`, schema: usernameParamSchema },
-  toggle_follow: { method: "POST", path: (a) => `/api/profile/${encodeURIComponent(String(a.username))}/follow`, schema: usernameParamSchema },
+  update_my_profile: { method: "PATCH", path: "/api/v1/profile/me", body: (a) => updateMyProfileSchema.parse(a) },
+  change_password: { method: "POST", path: "/api/v1/profile/password", body: (a) => changePasswordSchema.parse(a) },
+  update_profile_notifications: { method: "PATCH", path: "/api/v1/profile/notifications", body: (a) => updateProfileNotificationsSchema.parse(a) },
+  get_profile: { method: "GET", path: (a) => `/api/v1/profile/${encodeURIComponent(String(a.username))}`, schema: usernameParamSchema },
+  toggle_follow: { method: "POST", path: (a) => `/api/v1/profile/${encodeURIComponent(String(a.username))}/follow`, schema: usernameParamSchema },
 
   // Settings (POLA-792)
-  update_settings_profile: { method: "PATCH", path: "/api/settings/profile", body: (a) => updateSettingsProfileSchema.parse(a) },
-  get_settings_notifications: { method: "GET", path: "/api/settings/notifications" },
-  update_settings_notifications: { method: "PATCH", path: "/api/settings/notifications", body: (a) => updateSettingsNotificationsSchema.parse(a) },
-  update_settings_password: { method: "PATCH", path: "/api/settings/password", body: (a) => updateSettingsPasswordSchema.parse(a) },
-  get_beta_usage: { method: "GET", path: "/api/settings/beta-usage" },
-  get_gas_usage: { method: "GET", path: "/api/settings/gas" },
+  update_settings_profile: { method: "PATCH", path: "/api/v1/settings/profile", body: (a) => updateSettingsProfileSchema.parse(a) },
+  get_settings_notifications: { method: "GET", path: "/api/v1/settings/notifications" },
+  update_settings_notifications: { method: "PATCH", path: "/api/v1/settings/notifications", body: (a) => updateSettingsNotificationsSchema.parse(a) },
+  update_settings_password: { method: "PATCH", path: "/api/v1/settings/password", body: (a) => updateSettingsPasswordSchema.parse(a) },
+  get_beta_usage: { method: "GET", path: "/api/v1/settings/beta-usage" },
+  get_gas_usage: { method: "GET", path: "/api/v1/settings/gas" },
 
   // Support tickets (POLA-792)
-  create_ticket: { method: "POST", path: "/api/tickets", body: (a) => createTicketSchema.parse(a) },
-  list_tickets: { method: "GET", path: "/api/tickets", schema: listTicketsSchema, query: (a) => pickDefined(a, ["page", "limit"]) },
-  get_ticket: { method: "GET", path: (a) => `/api/tickets/${encodeURIComponent(String(a.id))}`, schema: ticketIdSchema },
-  add_ticket_message: { method: "POST", path: (a) => `/api/tickets/${encodeURIComponent(String(a.id))}/messages`, body: (a) => { const { id: _id, ...rest } = addTicketMessageSchema.parse(a); return rest; } },
+  create_ticket: { method: "POST", path: "/api/v1/tickets", body: (a) => createTicketSchema.parse(a) },
+  list_tickets: { method: "GET", path: "/api/v1/tickets", schema: listTicketsSchema, query: (a) => pickDefined(a, ["page", "limit"]) },
+  get_ticket: { method: "GET", path: (a) => `/api/v1/tickets/${encodeURIComponent(String(a.id))}`, schema: ticketIdSchema },
+  add_ticket_message: { method: "POST", path: (a) => `/api/v1/tickets/${encodeURIComponent(String(a.id))}/messages`, body: (a) => { const { id: _id, ...rest } = addTicketMessageSchema.parse(a); return rest; } },
 
   // Notification & venue preferences (POLA-792)
-  get_notification_preferences: { method: "GET", path: "/api/users/me/notification-preferences" },
-  update_notification_preferences: { method: "PUT", path: "/api/users/me/notification-preferences", body: (a) => updateEventNotificationsSchema.parse(a) },
-  get_venue_preferences: { method: "GET", path: "/api/users/me/venue-preferences" },
-  update_venue_preferences: { method: "PATCH", path: "/api/users/me/venue-preferences", body: (a) => updateVenuePreferencesSchema.parse(a) },
+  get_notification_preferences: { method: "GET", path: "/api/v1/users/me/notification-preferences" },
+  update_notification_preferences: { method: "PUT", path: "/api/v1/users/me/notification-preferences", body: (a) => updateEventNotificationsSchema.parse(a) },
+  get_venue_preferences: { method: "GET", path: "/api/v1/users/me/venue-preferences" },
+  update_venue_preferences: { method: "PATCH", path: "/api/v1/users/me/venue-preferences", body: (a) => updateVenuePreferencesSchema.parse(a) },
 };
 
 function pickDefined(obj: Record<string, unknown>, keys: string[]): Record<string, string> {

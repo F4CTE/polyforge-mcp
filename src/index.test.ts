@@ -317,12 +317,12 @@ describe("ROUTES", () => {
 
   it("get_profile builds path with encoded username", () => {
     const path = ROUTES.get_profile.path as (a: Record<string, unknown>) => string;
-    expect(path({ username: "john doe" })).toBe("/api/profile/john%20doe");
+    expect(path({ username: "john doe" })).toBe("/api/v1/profile/john%20doe");
   });
 
   it("toggle_follow builds path with encoded username", () => {
     const path = ROUTES.toggle_follow.path as (a: Record<string, unknown>) => string;
-    expect(path({ username: "alice" })).toBe("/api/profile/alice/follow");
+    expect(path({ username: "alice" })).toBe("/api/v1/profile/alice/follow");
   });
 
   // ── POLA-792: Settings routes ─────────────────────────────────────
@@ -396,7 +396,7 @@ describe("ROUTES", () => {
   it("get_ticket builds path with encoded UUID", () => {
     const path = ROUTES.get_ticket.path as (a: Record<string, unknown>) => string;
     const uuid = "550e8400-e29b-41d4-a716-446655440000";
-    expect(path({ id: uuid })).toBe(`/api/tickets/${uuid}`);
+    expect(path({ id: uuid })).toBe(`/api/v1/tickets/${uuid}`);
   });
 
   it("add_ticket_message strips id from body", () => {
@@ -435,6 +435,27 @@ describe("ROUTES", () => {
   it("get_notification_preferences is a GET with no body", () => {
     expect(ROUTES.get_notification_preferences.method).toBe("GET");
     expect(ROUTES.get_notification_preferences.body).toBeUndefined();
+  });
+
+  // ── Regression: every route must use /api/v1/ or /auth/v1/ prefix ──
+
+  it("all ROUTES paths start with /api/v1/ or /auth/v1/", () => {
+    const ALLOWED_PREFIXES = ["/api/v1/", "/auth/v1/"];
+    const violations: string[] = [];
+
+    for (const [name, route] of Object.entries(ROUTES)) {
+      let resolvedPath: string;
+      if (typeof route.path === "function") {
+        resolvedPath = route.path({ username: "test", id: "test", matchId: "test", slug: "test", marketId: "test" });
+      } else {
+        resolvedPath = route.path;
+      }
+      if (!ALLOWED_PREFIXES.some((prefix) => resolvedPath.startsWith(prefix))) {
+        violations.push(`${name}: ${resolvedPath}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
   });
 
   // ── POLA-792: All new tools exist in ROUTES ───────────────────────
