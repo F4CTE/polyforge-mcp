@@ -46,6 +46,26 @@ describe("ROUTES", () => {
     expect(result.items).toEqual(input.requests);
   });
 
+  // ── POLA-1021: #200 — batch request body size limit ────────────────
+
+  it("batch_requests rejects body exceeding 64 KB", () => {
+    const body = ROUTES.batch_requests.body!;
+    expect(() => {
+      body({
+        requests: [
+          {
+            id: "test",
+            method: "POST",
+            path: "/api/v1/markets",
+            body: Object.fromEntries(
+              Array.from({ length: 50 }, (_, i) => [`key${i}`, "x".repeat(2000)])
+            ),
+          },
+        ],
+      });
+    }).toThrow(/64 KB/);
+  });
+
   // ── POLA-790: Cross-venue arbitrage routes ──────────────────────────
 
   const POLA_790_ARBITRAGE_TOOLS = [
@@ -313,6 +333,24 @@ describe("ROUTES", () => {
     const body = ROUTES.update_profile_notifications.body!;
     const result = body({ email: true, sms: false });
     expect(result).toEqual({ email: true, sms: false });
+  });
+
+  // ── POLA-1021: #199 — notification preferences key count cap ───────
+
+  it("update_profile_notifications rejects more than 50 keys", () => {
+    const body = ROUTES.update_profile_notifications.body!;
+    const tooManyKeys = Object.fromEntries(
+      Array.from({ length: 51 }, (_, i) => [`pref${i}`, true])
+    );
+    expect(() => body(tooManyKeys)).toThrow();
+  });
+
+  it("update_profile_notifications accepts exactly 50 keys", () => {
+    const body = ROUTES.update_profile_notifications.body!;
+    const fiftyKeys = Object.fromEntries(
+      Array.from({ length: 50 }, (_, i) => [`pref${i}`, true])
+    );
+    expect(body(fiftyKeys)).toEqual(fiftyKeys);
   });
 
   it("get_profile builds path with encoded username", () => {
