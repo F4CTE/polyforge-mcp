@@ -32,7 +32,10 @@ const boundedRecord = (maxKeys: number) =>
 const blockSchema = z.object({
   id: z.string().optional(),
   type: z.string().max(100),
-  config: boundedRecord(20).optional(),
+  config: boundedRecord(20).refine(
+    (obj) => JSON.stringify(obj).length <= 16_384,
+    { message: "Block config must not exceed 16 KB" },
+  ).optional(),
 });
 
 const strategyVariableSchema = z.object({
@@ -69,7 +72,10 @@ const createStrategySchema = z.object({
     ).optional(),
     connections: z.array(z.object({ from: z.string().max(100), to: z.string().max(100) })).max(500).optional(),
     viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number().min(0.1).max(10) }).optional(),
-  }).catchall(z.unknown()).refine(
+  }).catchall(z.unknown().refine(
+    (v) => JSON.stringify(v ?? null).length <= 8_192,
+    { message: "Canvas additional property must not exceed 8 KB" },
+  )).refine(
     (obj) => Object.keys(obj).length <= 10,
     { message: "Canvas must have at most 10 top-level keys" },
   ).optional(),
@@ -415,7 +421,10 @@ const batchRequestItemSchema = z.object({
   path: z.string().min(1).max(500)
     .regex(BATCH_PATH_RE, "Path must be a user-facing /api/v1/ route")
     .refine((p) => !p.includes(".."), { message: "Path must not contain traversal sequences" }),
-  body: boundedRecord(50).optional(),
+  body: boundedRecord(50).refine(
+    (obj) => JSON.stringify(obj).length <= 65_536,
+    { message: "Batch request body must not exceed 64 KB" },
+  ).optional(),
 });
 
 const batchRequestsSchema = z.object({
@@ -575,7 +584,10 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 });
 
-const updateProfileNotificationsSchema = z.object({}).catchall(z.boolean());
+const updateProfileNotificationsSchema = z.object({}).catchall(z.boolean()).refine(
+  (obj) => Object.keys(obj).length <= 50,
+  { message: "Notification preferences must have at most 50 keys" },
+);
 
 const usernameParamSchema = z.object({
   username: z.string().min(1).max(100),
