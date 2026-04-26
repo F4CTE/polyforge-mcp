@@ -366,7 +366,7 @@ For continuous streaming, use the TypeScript, Python, or Rust SDK's `watchStrate
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `POLYFORGE_API_URL` | No | `http://localhost:3002` | Polyforge API base URL |
+| `POLYFORGE_API_URL` | No | `https://api.polyforge.app` | Polyforge API base URL |
 | `POLYFORGE_API_KEY` | Yes | — | API key from Settings > API Keys |
 
 ## Example Usage
