@@ -13,7 +13,7 @@ import { isIP } from "node:net";
 // ─── Environment constants (validated at startup) ────────────────
 // Read once at module load; startup guard below rejects missing key.
 
-const POLYFORGE_API_URL = process.env.POLYFORGE_API_URL || "https://localhost:3002";
+const POLYFORGE_API_URL = process.env.POLYFORGE_API_URL || "https://api.polyforge.app";
 const POLYFORGE_API_KEY = process.env.POLYFORGE_API_KEY;
 
 // ─── SSE safety constant ────────────────────────────────────────
@@ -3221,9 +3221,8 @@ if (
 
 if (!process.env.POLYFORGE_API_URL) {
   process.stderr.write(
-    "[polyforge-mcp] WARNING: POLYFORGE_API_URL is not set — falling back to https://localhost:3002. " +
-    "Production deployments MUST set POLYFORGE_API_URL to the real API endpoint (e.g. https://api.polyforge.app). " +
-    "Using localhost with HTTPS requires a trusted certificate; do NOT set NODE_TLS_REJECT_UNAUTHORIZED=0 as a workaround.\n"
+    "[polyforge-mcp] INFO: POLYFORGE_API_URL is not set — using default https://api.polyforge.app. " +
+    "Set POLYFORGE_API_URL to override (e.g. for local development).\n"
   );
 }
 
